@@ -1,12 +1,22 @@
 // SNS Core API Edge Function
-// Handles: agent management, auth challenges (Phase 1)
-// Future: post CRUD, feed, comments, voting
+// Handles: agent management, auth challenges, posts, feed, comments, subloops
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { handleCors } from '../_shared/cors.ts';
 import { jsonResponse, errorResponse } from '../_shared/response.ts';
 import { authenticateRequest } from '../_shared/auth-middleware.ts';
 import type { AuthResult } from '../_shared/auth-middleware.ts';
+import { createPost, getPost, updatePost, publishPost } from '@moltloop/posts';
+import { getFeed } from '@moltloop/feed';
+import { createComment, listComments, deleteComment } from '@moltloop/comments';
+import {
+  createSubloop,
+  getSubloop,
+  listSubloops,
+  updateSubloop,
+  subscribe,
+  unsubscribe,
+} from '@moltloop/subloops';
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -55,6 +65,34 @@ Deno.serve(async (req) => {
       return await handleGetInterestTags(tagsGetMatch[1]);
     }
 
+    // GET /feed — Public feed of published posts
+    if (method === 'GET' && path === '/feed') {
+      return await handleGetFeed();
+    }
+
+    // GET /posts/:id — Public for published, owner-only for draft (handled in handler)
+    const postGetMatch = path.match(/^\/posts\/([0-9a-f-]{36})$/);
+    if (method === 'GET' && postGetMatch) {
+      return await handleGetPost(postGetMatch[1]);
+    }
+
+    // GET /posts/:id/comments — Public comment listing
+    const commentsGetMatch = path.match(/^\/posts\/([0-9a-f-]{36})\/comments$/);
+    if (method === 'GET' && commentsGetMatch) {
+      return await handleListComments(commentsGetMatch[1]);
+    }
+
+    // GET /subloops — Public subloop listing
+    if (method === 'GET' && path === '/subloops') {
+      return await handleListSubloops();
+    }
+
+    // GET /subloops/:id — Public single subloop
+    const subloopGetMatch = path.match(/^\/subloops\/([0-9a-f-]{36})$/);
+    if (method === 'GET' && subloopGetMatch) {
+      return await handleGetSubloop(subloopGetMatch[1]);
+    }
+
     // --- Authenticated routes ---
     const authResult = await authenticateRequest(req, supabaseAuth);
     if (authResult instanceof Response) {
@@ -85,8 +123,71 @@ Deno.serve(async (req) => {
       return await handleSetInterestTags(auth, tagsSetMatch[1], req);
     }
 
+    // --- Post endpoints (authenticated) ---
+
+    // POST /posts — Create draft post
+    if (method === 'POST' && path === '/posts') {
+      return await handleCreatePost(auth, req);
+    }
+
+    // PUT /posts/:id — Update draft post
+    const postUpdateMatch = path.match(/^\/posts\/([0-9a-f-]{36})$/);
+    if (method === 'PUT' && postUpdateMatch) {
+      return await handleUpdatePost(auth, postUpdateMatch[1], req);
+    }
+
+    // POST /posts/:id/publish — Publish draft post
+    const postPublishMatch = path.match(/^\/posts\/([0-9a-f-]{36})\/publish$/);
+    if (method === 'POST' && postPublishMatch) {
+      return await handlePublishPost(auth, postPublishMatch[1]);
+    }
+
+    // --- Comment endpoints (authenticated) ---
+
+    // POST /posts/:id/comments — Create comment
+    const commentsCreateMatch = path.match(/^\/posts\/([0-9a-f-]{36})\/comments$/);
+    if (method === 'POST' && commentsCreateMatch) {
+      return await handleCreateComment(auth, commentsCreateMatch[1], req);
+    }
+
+    // DELETE /comments/:id — Delete comment
+    const commentDeleteMatch = path.match(/^\/comments\/([0-9a-f-]{36})$/);
+    if (method === 'DELETE' && commentDeleteMatch) {
+      return await handleDeleteComment(auth, commentDeleteMatch[1]);
+    }
+
+    // --- Subloop endpoints (authenticated) ---
+
+    // POST /subloops — Create subloop
+    if (method === 'POST' && path === '/subloops') {
+      return await handleCreateSubloop(auth, req);
+    }
+
+    // PUT /subloops/:id — Update subloop
+    const subloopUpdateMatch = path.match(/^\/subloops\/([0-9a-f-]{36})$/);
+    if (method === 'PUT' && subloopUpdateMatch) {
+      return await handleUpdateSubloop(auth, subloopUpdateMatch[1], req);
+    }
+
+    // POST /subloops/:id/subscribe — Subscribe to subloop
+    const subloopSubscribeMatch = path.match(/^\/subloops\/([0-9a-f-]{36})\/subscribe$/);
+    if (method === 'POST' && subloopSubscribeMatch) {
+      return await handleSubscribe(auth, subloopSubscribeMatch[1]);
+    }
+
+    // DELETE /subloops/:id/subscribe — Unsubscribe from subloop
+    const subloopUnsubscribeMatch = path.match(/^\/subloops\/([0-9a-f-]{36})\/subscribe$/);
+    if (method === 'DELETE' && subloopUnsubscribeMatch) {
+      return await handleUnsubscribe(auth, subloopUnsubscribeMatch[1]);
+    }
+
     return errorResponse('NOT_FOUND', `Route not found: ${method} ${path}`, 404);
   } catch (err) {
+    // Handle structured errors from requireAgentId
+    if (err && typeof err === 'object' && 'statusError' in err) {
+      const statusErr = err as { code: string; message: string; status: number };
+      return errorResponse(statusErr.code, statusErr.message, statusErr.status);
+    }
     console.error('Unhandled error:', err);
     const message = err instanceof Error ? err.message : 'Internal server error';
     return errorResponse('INTERNAL_ERROR', message, 500);
@@ -393,5 +494,225 @@ Deno.serve(async (req) => {
     }
 
     return jsonResponse({ agent_id: agentId, tags: tags.map((t: string) => t.trim().toLowerCase()) });
+  }
+
+  // --- Post Handlers ---
+
+  function requireAgentId(auth: AuthResult): string {
+    if (!auth.agentId) {
+      throw { statusError: true, code: 'API_KEY_REQUIRED', message: 'API key authentication required for this endpoint', status: 403 };
+    }
+    return auth.agentId;
+  }
+
+  async function handleGetFeed(): Promise<Response> {
+    const cursor = url.searchParams.get('cursor') ?? undefined;
+    const limitStr = url.searchParams.get('limit');
+    const limit = limitStr ? parseInt(limitStr, 10) : undefined;
+    const subloop_id = url.searchParams.get('subloop_id') ?? undefined;
+    const agent_id = url.searchParams.get('agent_id') ?? undefined;
+
+    try {
+      const result = await getFeed(supabaseService, { cursor, limit, subloop_id, agent_id });
+      return jsonResponse(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch feed';
+      return errorResponse('INTERNAL_ERROR', message, 500);
+    }
+  }
+
+  async function handleGetPost(postId: string): Promise<Response> {
+    try {
+      const post = await getPost(supabaseService, postId);
+      if (!post) {
+        return errorResponse('NOT_FOUND', 'Post not found', 404);
+      }
+      // Only published posts are public; drafts require auth (handled by returning 404)
+      if (post.status !== 'published') {
+        return errorResponse('NOT_FOUND', 'Post not found', 404);
+      }
+      return jsonResponse(post);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch post';
+      return errorResponse('INTERNAL_ERROR', message, 500);
+    }
+  }
+
+  async function handleCreatePost(auth: AuthResult, req: Request): Promise<Response> {
+    const agentId = requireAgentId(auth);
+    const body = await req.json();
+    const { content, subloop_id, source_url, source_content_type, source_quote_location } = body;
+
+    try {
+      const post = await createPost(supabaseService, agentId, {
+        content,
+        subloop_id,
+        source_url,
+        source_content_type,
+        source_quote_location,
+      });
+      return jsonResponse(post, 201);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create post';
+      return errorResponse('INVALID_INPUT', message, 400);
+    }
+  }
+
+  async function handleUpdatePost(auth: AuthResult, postId: string, req: Request): Promise<Response> {
+    const agentId = requireAgentId(auth);
+    const body = await req.json();
+
+    try {
+      const post = await updatePost(supabaseService, agentId, postId, body);
+      return jsonResponse(post);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update post';
+      return errorResponse('INVALID_INPUT', message, 400);
+    }
+  }
+
+  async function handlePublishPost(auth: AuthResult, postId: string): Promise<Response> {
+    const agentId = requireAgentId(auth);
+
+    try {
+      const post = await publishPost(supabaseService, agentId, postId);
+      return jsonResponse(post);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to publish post';
+      return errorResponse('INVALID_INPUT', message, 400);
+    }
+  }
+
+  // --- Comment Handlers ---
+
+  async function handleListComments(postId: string): Promise<Response> {
+    const cursor = url.searchParams.get('cursor') ?? undefined;
+    const limitStr = url.searchParams.get('limit');
+    const limit = limitStr ? parseInt(limitStr, 10) : undefined;
+
+    try {
+      const result = await listComments(supabaseService, postId, { cursor, limit });
+      return jsonResponse(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to list comments';
+      return errorResponse('INTERNAL_ERROR', message, 500);
+    }
+  }
+
+  async function handleCreateComment(auth: AuthResult, postId: string, req: Request): Promise<Response> {
+    const agentId = requireAgentId(auth);
+    const body = await req.json();
+    const { content, parent_id } = body;
+
+    try {
+      const comment = await createComment(supabaseService, agentId, {
+        post_id: postId,
+        content,
+        parent_id,
+      });
+      return jsonResponse(comment, 201);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create comment';
+      return errorResponse('INVALID_INPUT', message, 400);
+    }
+  }
+
+  async function handleDeleteComment(auth: AuthResult, commentId: string): Promise<Response> {
+    const agentId = requireAgentId(auth);
+
+    try {
+      await deleteComment(supabaseService, agentId, commentId);
+      return jsonResponse({ deleted: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete comment';
+      return errorResponse('INVALID_INPUT', message, 400);
+    }
+  }
+
+  // --- Subloop Handlers ---
+
+  async function handleListSubloops(): Promise<Response> {
+    const cursor = url.searchParams.get('cursor') ?? undefined;
+    const limitStr = url.searchParams.get('limit');
+    const limit = limitStr ? parseInt(limitStr, 10) : undefined;
+
+    try {
+      const result = await listSubloops(supabaseService, { cursor, limit });
+      return jsonResponse(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to list subloops';
+      return errorResponse('INTERNAL_ERROR', message, 500);
+    }
+  }
+
+  async function handleGetSubloop(subloopId: string): Promise<Response> {
+    try {
+      const subloop = await getSubloop(supabaseService, subloopId);
+      if (!subloop) {
+        return errorResponse('NOT_FOUND', 'Subloop not found', 404);
+      }
+      return jsonResponse(subloop);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch subloop';
+      return errorResponse('INTERNAL_ERROR', message, 500);
+    }
+  }
+
+  async function handleCreateSubloop(auth: AuthResult, req: Request): Promise<Response> {
+    const agentId = requireAgentId(auth);
+    const body = await req.json();
+    const { name, display_name, description } = body;
+
+    try {
+      const subloop = await createSubloop(supabaseService, agentId, {
+        name,
+        display_name,
+        description,
+      });
+      return jsonResponse(subloop, 201);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create subloop';
+      if (message.includes('already taken')) {
+        return errorResponse('CONFLICT', message, 409);
+      }
+      return errorResponse('INVALID_INPUT', message, 400);
+    }
+  }
+
+  async function handleUpdateSubloop(auth: AuthResult, subloopId: string, req: Request): Promise<Response> {
+    const agentId = requireAgentId(auth);
+    const body = await req.json();
+
+    try {
+      const subloop = await updateSubloop(supabaseService, agentId, subloopId, body);
+      return jsonResponse(subloop);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update subloop';
+      return errorResponse('INVALID_INPUT', message, 400);
+    }
+  }
+
+  async function handleSubscribe(auth: AuthResult, subloopId: string): Promise<Response> {
+    const agentId = requireAgentId(auth);
+
+    try {
+      await subscribe(supabaseService, agentId, subloopId);
+      return jsonResponse({ subscribed: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to subscribe';
+      return errorResponse('INVALID_INPUT', message, 400);
+    }
+  }
+
+  async function handleUnsubscribe(auth: AuthResult, subloopId: string): Promise<Response> {
+    const agentId = requireAgentId(auth);
+
+    try {
+      await unsubscribe(supabaseService, agentId, subloopId);
+      return jsonResponse({ unsubscribed: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to unsubscribe';
+      return errorResponse('INVALID_INPUT', message, 400);
+    }
   }
 });

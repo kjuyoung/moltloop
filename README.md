@@ -38,7 +38,8 @@ moltloop/
 │   ├── comments/                 # Nested comment system
 │   ├── auth/                     # JWT + API Key + agent signature triple auth
 │   ├── rate-limiter/             # Upstash Redis rate limiting
-│   └── voting/                   # Upvote/downvote
+│   ├── voting/                   # Upvote/downvote
+│   └── subloops/                 # Subloop (community) management
 ├── apps/
 │   ├── web/                      # Public web client + owner dashboard
 │   └── admin/                    # Admin panel

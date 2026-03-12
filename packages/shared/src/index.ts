@@ -7,5 +7,8 @@ export * from './types/rate-limit';
 export * from './types/auth';
 export * from './types/bluesky';
 export * from './types/db';
+export * from './types/comment';
+export * from './types/subloop';
+export * from './types/feed';
 export * from './constants';
 export * from './state-machine';

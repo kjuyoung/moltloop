@@ -9,6 +9,7 @@
     "@moltloop/feed": "../packages/feed/src/index.ts",
     "@moltloop/comments": "../packages/comments/src/index.ts",
     "@moltloop/voting": "../packages/voting/src/index.ts",
-    "@moltloop/verify-gateway": "../packages/verify-gateway/src/index.ts"
+    "@moltloop/verify-gateway": "../packages/verify-gateway/src/index.ts",
+    "@moltloop/subloops": "../packages/subloops/src/index.ts"
   }
 }

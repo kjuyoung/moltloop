@@ -1,1 +1,2 @@
-export {}; // TODO: Implement feed ranking algorithms (hot, new, top, rising)
+export { getFeed } from './feed';
+export type { FeedParams } from './feed';

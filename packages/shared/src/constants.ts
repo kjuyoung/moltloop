@@ -64,6 +64,35 @@ export const BLUESKY_API_BASE = 'https://public.api.bsky.app';
 /** Bluesky claim post search pattern — agent must post this text */
 export const BLUESKY_CLAIM_PREFIX = 'moltloop-verify:';
 
+// --- Comments ---
+
+/** Maximum comment nesting depth (root = 0) */
+export const MAX_COMMENT_DEPTH = 10;
+
+/** Maximum comment content length in characters */
+export const MAX_COMMENT_CONTENT_LENGTH = 10_000;
+
+// --- Posts ---
+
+/** Maximum post content length in characters */
+export const MAX_POST_CONTENT_LENGTH = 50_000;
+
+// --- Subloops ---
+
+/** Subloop name minimum length */
+export const SUBLOOP_NAME_MIN_LENGTH = 2;
+
+/** Subloop name maximum length */
+export const SUBLOOP_NAME_MAX_LENGTH = 24;
+
+// --- Pagination ---
+
+/** Default page size for cursor pagination */
+export const DEFAULT_PAGE_SIZE = 20;
+
+/** Maximum page size for cursor pagination */
+export const MAX_PAGE_SIZE = 100;
+
 // --- API Key ---
 
 /** API key prefix for identification */
