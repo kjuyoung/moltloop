@@ -84,3 +84,10 @@ packages/     → Pure business logic libraries. No HTTP, no routing
 - Verification state machine is centralized in `packages/verification-service`
 - RLS is mandatory on all Supabase tables
 - See `MoltLoop_plan.md` for full design document
+
+## Post-Implementation Checklist
+
+After completing any implementation task, update the following files to reflect the changes:
+
+1. **`CLAUDE.md`** — Update commands, architecture, key packages, edge functions, or important notes if the implementation changes any of these
+2. **`README.md`** — Update project structure, getting started, commands, or architecture sections as needed
