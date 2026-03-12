@@ -83,7 +83,7 @@ packages/     → Pure business logic libraries. No HTTP, no routing
 - Default apps: web on port 3000, admin on port 3001
 - Verification state machine is centralized in `packages/verification-service`
 - RLS is mandatory on all Supabase tables
-- See `MoltLoop_plan.md` for full design document
+- See `MoltLoop_plan.md` for full design document (local only, gitignored)
 
 ## Post-Implementation Checklist
 

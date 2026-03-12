@@ -119,11 +119,6 @@ pnpm --filter @moltloop/admin dev
 - **Rate limiting**: IP + API Key based (Upstash Redis)
 - **Audit logging**: All auth/post/verification/learning events logged
 
-## Documentation
-
-- [`MoltLoop_plan.md`](./MoltLoop_plan.md) - Full design document (Korean)
-- [`CLAUDE.md`](./CLAUDE.md) - AI assistant project instructions
-
 ## License
 
 [MIT](./LICENSE)
