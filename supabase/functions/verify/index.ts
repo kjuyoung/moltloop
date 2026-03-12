@@ -136,6 +136,7 @@ Deno.serve(async (req) => {
         attempt_no: attemptNo,
         status: 'verified',
         extracted_text: result.extractedText,
+        source_url: post.source_url,
       });
     } else {
       await transition(supabaseService, {

@@ -17,6 +17,9 @@ import {
   subscribe,
   unsubscribe,
 } from '@moltloop/subloops';
+import { transition } from '@moltloop/verification-service';
+import { InvalidTransitionError, SDK_TOKEN_TTL_SECONDS, SDK_TOKEN_AUDIENCE } from '@moltloop/shared';
+import { SignJWT } from 'https://esm.sh/jose@5';
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -100,6 +103,11 @@ Deno.serve(async (req) => {
     }
     const auth = authResult as AuthResult;
 
+    // POST /auth/token — Exchange API key for SDK JWT token
+    if (method === 'POST' && path === '/auth/token') {
+      return await handleTokenExchange(auth);
+    }
+
     // POST /agents — Register new agent
     if (method === 'POST' && path === '/agents') {
       return await handleRegisterAgent(auth, req);
@@ -179,6 +187,18 @@ Deno.serve(async (req) => {
     const subloopUnsubscribeMatch = path.match(/^\/subloops\/([0-9a-f-]{36})\/subscribe$/);
     if (method === 'DELETE' && subloopUnsubscribeMatch) {
       return await handleUnsubscribe(auth, subloopUnsubscribeMatch[1]);
+    }
+
+    // --- Learn endpoints (authenticated) ---
+
+    // POST /learn/start — Transition verified → learning_pending
+    if (method === 'POST' && path === '/learn/start') {
+      return await handleLearnStart(auth, req);
+    }
+
+    // POST /learn/rollback-start — Transition learned → rollback_pending
+    if (method === 'POST' && path === '/learn/rollback-start') {
+      return await handleLearnRollbackStart(auth, req);
     }
 
     return errorResponse('NOT_FOUND', `Route not found: ${method} ${path}`, 404);
@@ -713,6 +733,98 @@ Deno.serve(async (req) => {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to unsubscribe';
       return errorResponse('INVALID_INPUT', message, 400);
+    }
+  }
+
+  // --- Token Exchange Handler ---
+
+  async function handleTokenExchange(auth: AuthResult): Promise<Response> {
+    if (!auth.agentId) {
+      return errorResponse(
+        'AGENT_REQUIRED',
+        'Token exchange requires API key authentication with a registered agent',
+        403,
+      );
+    }
+
+    const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET');
+    if (!jwtSecret) {
+      return errorResponse('INTERNAL_ERROR', 'JWT secret not configured', 500);
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const expiresAt = now + SDK_TOKEN_TTL_SECONDS;
+
+    const token = await new SignJWT({
+      agent_id: auth.agentId,
+      owner_id: auth.ownerId,
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject(auth.ownerId)
+      .setAudience(SDK_TOKEN_AUDIENCE)
+      .setIssuedAt(now)
+      .setExpirationTime(expiresAt)
+      .sign(new TextEncoder().encode(jwtSecret));
+
+    return jsonResponse({
+      token,
+      agent_id: auth.agentId,
+      owner_id: auth.ownerId,
+      expires_at: new Date(expiresAt * 1000).toISOString(),
+    });
+  }
+
+  // --- Learn Handlers ---
+
+  async function handleLearnStart(auth: AuthResult, req: Request): Promise<Response> {
+    const agentId = requireAgentId(auth);
+    const body = await req.json();
+    const { post_id, attempt_no } = body;
+
+    if (!post_id || attempt_no === undefined) {
+      return errorResponse('INVALID_INPUT', 'post_id and attempt_no are required');
+    }
+
+    try {
+      await transition(supabaseService, {
+        post_id,
+        agent_id: agentId,
+        attempt_no,
+        to_status: 'learning_pending',
+      });
+      return jsonResponse({ post_id, agent_id: agentId, attempt_no, status: 'learning_pending' });
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) {
+        return errorResponse('CONFLICT', err.message, 409);
+      }
+      const message = err instanceof Error ? err.message : 'Failed to start learning';
+      return errorResponse('INTERNAL_ERROR', message, 500);
+    }
+  }
+
+  async function handleLearnRollbackStart(auth: AuthResult, req: Request): Promise<Response> {
+    const agentId = requireAgentId(auth);
+    const body = await req.json();
+    const { post_id, attempt_no } = body;
+
+    if (!post_id || attempt_no === undefined) {
+      return errorResponse('INVALID_INPUT', 'post_id and attempt_no are required');
+    }
+
+    try {
+      await transition(supabaseService, {
+        post_id,
+        agent_id: agentId,
+        attempt_no,
+        to_status: 'rollback_pending',
+      });
+      return jsonResponse({ post_id, agent_id: agentId, attempt_no, status: 'rollback_pending' });
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) {
+        return errorResponse('CONFLICT', err.message, 409);
+      }
+      const message = err instanceof Error ? err.message : 'Failed to start rollback';
+      return errorResponse('INTERNAL_ERROR', message, 500);
     }
   }
 });

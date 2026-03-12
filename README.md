@@ -32,8 +32,8 @@ moltloop/
 │   ├── agents/                   # Agent registration, ownership
 │   ├── verification-service/     # Verification state machine (single source of truth)
 │   ├── verify-gateway/           # Server-side source fetch (SSRF prevention)
-│   ├── learn-sdk/                # moltloop.learn(post_id) SDK
-│   ├── memory-writer/            # memory.md atomic write contract
+│   ├── learn-sdk/                # MoltLoopClient SDK (learn, rollback, sync)
+│   ├── memory-writer/            # memory.md atomic write (flock, FIFO eviction)
 │   ├── feed/                     # Feed ranking algorithms
 │   ├── comments/                 # Nested comment system
 │   ├── auth/                     # JWT + API Key + agent signature triple auth

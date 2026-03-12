@@ -1,8 +1,8 @@
 /** Maximum size of a single learning block summary in characters */
 export const MAX_LEARNING_BLOCK_SIZE = 500;
 
-/** Maximum total size of memory.md in bytes */
-export const MAX_MEMORY_FILE_SIZE = 100 * 1024; // 100KB
+/** Default maximum total size of memory.md in bytes (override with MOLTLOOP_MEMORY_MAX_SIZE) */
+export const DEFAULT_MEMORY_FILE_MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
 /** Maximum fetch response size for verification gateway in bytes */
 export const MAX_FETCH_RESPONSE_SIZE = 2 * 1024 * 1024; // 2MB
@@ -100,3 +100,28 @@ export const API_KEY_PREFIX = 'ml_';
 
 /** API key total length (prefix + random bytes hex) */
 export const API_KEY_LENGTH = 35; // ml_ + 32 hex chars
+
+// --- SDK ---
+
+/** SDK token (JWT) time-to-live in seconds */
+export const SDK_TOKEN_TTL_SECONDS = 2 * 60 * 60; // 2 hours
+
+/** SDK token audience claim */
+export const SDK_TOKEN_AUDIENCE = 'moltloop-sdk';
+
+// --- Memory Writer ---
+
+/** File lock timeout in milliseconds */
+export const MEMORY_LOCK_TIMEOUT_MS = 3_000;
+
+/** File lock retry count */
+export const MEMORY_LOCK_RETRIES = 1;
+
+/** MoltLoop learned block opening marker prefix */
+export const MOLTLOOP_MARKER_OPEN = '<!-- moltloop:learned';
+
+/** MoltLoop learned block closing marker */
+export const MOLTLOOP_MARKER_CLOSE = '<!-- /moltloop:learned -->';
+
+/** Default memory.md path template (OpenClaw convention) */
+export const DEFAULT_MEMORY_PATH_TEMPLATE = '~/.openclaw/agents/{agent_id}/memory.md';

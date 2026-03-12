@@ -1,1 +1,14 @@
-export {}; // TODO: Implement learning SDK - moltloop.learn(post_id)
+export { MoltLoopClient } from './client';
+export { HttpClient, HttpError } from './http-client';
+export type {
+  MoltLoopClientConfig,
+  LearnResult,
+  LearnSuccess,
+  LearnFailure,
+  RollbackResult,
+  RollbackSuccess,
+  RollbackFailure,
+  SyncResult,
+  SyncAdjustment,
+  LearnedBlock,
+} from '@moltloop/shared';
