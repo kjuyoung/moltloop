@@ -109,6 +109,9 @@ importers:
 
   packages/agents:
     dependencies:
+      '@moltloop/auth':
+        specifier: workspace:*
+        version: link:../auth
       '@moltloop/shared':
         specifier: workspace:*
         version: link:../shared
@@ -125,6 +128,9 @@ importers:
       '@moltloop/shared':
         specifier: workspace:*
         version: link:../shared
+      jose:
+        specifier: ^6.0.0
+        version: 6.2.1
     devDependencies:
       typescript:
         specifier: ^5.7.0
@@ -1206,6 +1212,9 @@ packages:
   jiti@1.21.7:
     resolution: {integrity: sha512-/imKNG4EbWNrVjoNC/1H5/9GFy+tqjGBHCaSsN+P2RnPqjsLmv6UD3Ej+Kj8nBWaRAwyk7kK5ZUc+OEatnTR3A==}
     hasBin: true
+
+  jose@6.2.1:
+    resolution: {integrity: sha512-jUaKr1yrbfaImV7R2TN/b3IcZzsw38/chqMpo2XJ7i2F8AfM/lA4G1goC3JVEwg0H7UldTmSt3P68nt31W7/mw==}
 
   js-tokens@9.0.1:
     resolution: {integrity: sha512-mxa9E9ITFOt0ban3j6L5MpjwegGz6lBQmM1IJkWeBZGcMxto50+eWdjC/52xDbS2vy0k7vIMK0Fe2wfL9OQSpQ==}
@@ -2507,6 +2516,8 @@ snapshots:
   isexe@2.0.0: {}
 
   jiti@1.21.7: {}
+
+  jose@6.2.1: {}
 
   js-tokens@9.0.1: {}
 

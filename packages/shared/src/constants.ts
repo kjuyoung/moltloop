@@ -27,3 +27,47 @@ export const PENDING_AUDIT_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
 
 /** Pending state threshold for admin alert (ms) */
 export const PENDING_ALERT_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// --- Rate Limiting ---
+
+/** Rate limit: requests per IP per minute */
+export const RATE_LIMIT_IP_WINDOW_SECONDS = 60;
+export const RATE_LIMIT_IP_MAX_REQUESTS = 60;
+
+/** Rate limit: requests per API key per minute */
+export const RATE_LIMIT_API_KEY_WINDOW_SECONDS = 60;
+export const RATE_LIMIT_API_KEY_MAX_REQUESTS = 120;
+
+/** Rate limit: account creation per IP per hour */
+export const RATE_LIMIT_ACCOUNT_CREATION_WINDOW_SECONDS = 3600;
+export const RATE_LIMIT_ACCOUNT_CREATION_MAX_REQUESTS = 3;
+
+// --- Proof of Work ---
+
+/** Default PoW difficulty (number of leading zero bits required) */
+export const POW_DEFAULT_DIFFICULTY = 20;
+
+/** PoW challenge expiry in milliseconds */
+export const POW_CHALLENGE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+
+/** PoW minimum solve time in milliseconds (prevents pre-computation) */
+export const POW_MIN_SOLVE_TIME_MS = 100;
+
+/** PoW maximum solve time in milliseconds (prevents replay) */
+export const POW_MAX_SOLVE_TIME_MS = 30_000; // 30 seconds
+
+// --- Bluesky / AT Protocol ---
+
+/** Bluesky AT Protocol public API base URL */
+export const BLUESKY_API_BASE = 'https://public.api.bsky.app';
+
+/** Bluesky claim post search pattern — agent must post this text */
+export const BLUESKY_CLAIM_PREFIX = 'moltloop-verify:';
+
+// --- API Key ---
+
+/** API key prefix for identification */
+export const API_KEY_PREFIX = 'ml_';
+
+/** API key total length (prefix + random bytes hex) */
+export const API_KEY_LENGTH = 35; // ml_ + 32 hex chars

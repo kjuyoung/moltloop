@@ -1,19 +1,397 @@
 // SNS Core API Edge Function
-// Handles: post CRUD, feed, comments, voting, agent management
-// Imports from: @moltloop/posts, @moltloop/agents, @moltloop/feed,
-//              @moltloop/comments, @moltloop/auth, @moltloop/rate-limiter, @moltloop/voting
+// Handles: agent management, auth challenges (Phase 1)
+// Future: post CRUD, feed, comments, voting
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { handleCors } from '../_shared/cors.ts';
+import { jsonResponse, errorResponse } from '../_shared/response.ts';
+import { authenticateRequest } from '../_shared/auth-middleware.ts';
+import type { AuthResult } from '../_shared/auth-middleware.ts';
 
 Deno.serve(async (req) => {
-  const url = new URL(req.url);
+  // Handle CORS preflight
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
-  return new Response(
-    JSON.stringify({
-      message: 'MoltLoop API',
-      path: url.pathname,
-      status: 'not_implemented',
-    }),
-    {
-      headers: { 'Content-Type': 'application/json' },
-    },
-  );
+  const url = new URL(req.url);
+  const path = url.pathname.replace(/^\/api/, '');
+  const method = req.method;
+
+  // Create Supabase clients
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  // Anon client for auth verification
+  const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: req.headers.get('authorization') ?? '' } },
+  });
+
+  // Service role client for privileged operations
+  const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+
+  try {
+    // --- Public routes (no auth required) ---
+
+    // POST /auth/challenge — PoW challenge issuance
+    if (method === 'POST' && path === '/auth/challenge') {
+      return await handleCreateChallenge();
+    }
+
+    // POST /auth/verify-challenge — PoW solution verification
+    if (method === 'POST' && path === '/auth/verify-challenge') {
+      return await handleVerifyChallenge(req);
+    }
+
+    // GET /agents/:id — Public agent profile (no auth for read)
+    const agentIdMatch = path.match(/^\/agents\/([0-9a-f-]{36})$/);
+    if (method === 'GET' && agentIdMatch) {
+      return await handleGetAgent(agentIdMatch[1]);
+    }
+
+    // GET /agents/:id/interest-tags — Public interest tags
+    const tagsGetMatch = path.match(/^\/agents\/([0-9a-f-]{36})\/interest-tags$/);
+    if (method === 'GET' && tagsGetMatch) {
+      return await handleGetInterestTags(tagsGetMatch[1]);
+    }
+
+    // --- Authenticated routes ---
+    const authResult = await authenticateRequest(req, supabaseAuth);
+    if (authResult instanceof Response) {
+      return authResult;
+    }
+    const auth = authResult as AuthResult;
+
+    // POST /agents — Register new agent
+    if (method === 'POST' && path === '/agents') {
+      return await handleRegisterAgent(auth, req);
+    }
+
+    // PUT /agents/:id — Update agent profile
+    const agentUpdateMatch = path.match(/^\/agents\/([0-9a-f-]{36})$/);
+    if (method === 'PUT' && agentUpdateMatch) {
+      return await handleUpdateAgent(auth, agentUpdateMatch[1], req);
+    }
+
+    // POST /agents/:id/verify-ownership — Bluesky ownership verification
+    const ownershipMatch = path.match(/^\/agents\/([0-9a-f-]{36})\/verify-ownership$/);
+    if (method === 'POST' && ownershipMatch) {
+      return await handleVerifyOwnership(auth, ownershipMatch[1]);
+    }
+
+    // PUT /agents/:id/interest-tags — Set interest tags
+    const tagsSetMatch = path.match(/^\/agents\/([0-9a-f-]{36})\/interest-tags$/);
+    if (method === 'PUT' && tagsSetMatch) {
+      return await handleSetInterestTags(auth, tagsSetMatch[1], req);
+    }
+
+    return errorResponse('NOT_FOUND', `Route not found: ${method} ${path}`, 404);
+  } catch (err) {
+    console.error('Unhandled error:', err);
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return errorResponse('INTERNAL_ERROR', message, 500);
+  }
+
+  // --- Route Handlers ---
+
+  async function handleCreateChallenge(): Promise<Response> {
+    // Dynamic import to avoid bundling issues in Deno
+    const { createChallenge } = await import('../_shared/pow-helpers.ts');
+    const challenge = createChallenge();
+    return jsonResponse(challenge);
+  }
+
+  async function handleVerifyChallenge(req: Request): Promise<Response> {
+    const body = await req.json();
+    const { nonce, solution, solve_time_ms } = body;
+
+    if (!nonce || !solution || solve_time_ms === undefined) {
+      return errorResponse('INVALID_INPUT', 'Missing nonce, solution, or solve_time_ms');
+    }
+
+    // Retrieve the challenge from a simple in-memory or DB store
+    // For now, reconstruct and verify the solution
+    const { verifySolution } = await import('../_shared/pow-helpers.ts');
+    const result = await verifySolution(nonce, solution, solve_time_ms);
+
+    if (!result.valid) {
+      return errorResponse('POW_FAILED', result.reason ?? 'Invalid solution', 400);
+    }
+
+    return jsonResponse({ verified: true });
+  }
+
+  async function handleGetAgent(agentId: string): Promise<Response> {
+    const { data, error } = await supabaseService
+      .from('agents')
+      .select('id, name, platform, description, avatar_url, llm_provider, llm_model, homepage_url, bluesky_handle, ownership_verified, stats, created_at')
+      .eq('id', agentId)
+      .single();
+
+    if (error || !data) {
+      return errorResponse('NOT_FOUND', 'Agent not found', 404);
+    }
+
+    return jsonResponse(data);
+  }
+
+  async function handleGetInterestTags(agentId: string): Promise<Response> {
+    const { data, error } = await supabaseService
+      .from('agent_interest_tags')
+      .select('tag')
+      .eq('agent_id', agentId);
+
+    if (error) {
+      return errorResponse('INTERNAL_ERROR', 'Failed to fetch tags', 500);
+    }
+
+    const tags = (data ?? []).map((row: { tag: string }) => row.tag);
+    return jsonResponse({ agent_id: agentId, tags });
+  }
+
+  async function handleRegisterAgent(auth: AuthResult, req: Request): Promise<Response> {
+    const body = await req.json();
+    const { name, platform, description, llm_provider, llm_model, homepage_url, bluesky_handle, interest_topics } = body;
+
+    if (!name) {
+      return errorResponse('INVALID_INPUT', 'Agent name is required');
+    }
+
+    // Validate name format
+    const nameRegex = /^[a-zA-Z0-9_-]+$/;
+    if (name.length < 2 || name.length > 50 || !nameRegex.test(name)) {
+      return errorResponse('INVALID_INPUT', 'Agent name must be 2-50 characters, alphanumeric with hyphens and underscores');
+    }
+
+    // Check name uniqueness
+    const { data: existing } = await supabaseService
+      .from('agents')
+      .select('id')
+      .eq('name', name)
+      .maybeSingle();
+
+    if (existing) {
+      return errorResponse('CONFLICT', `Agent name '${name}' is already taken`, 409);
+    }
+
+    // Generate API key
+    const keyBytes = new Uint8Array(16);
+    crypto.getRandomValues(keyBytes);
+    const hex = Array.from(keyBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+    const apiKey = `ml_${hex}`;
+
+    // Hash API key
+    const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(apiKey));
+    const apiKeyHash = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('');
+
+    // Insert agent
+    const { data: agent, error: insertError } = await supabaseService
+      .from('agents')
+      .insert({
+        owner_id: auth.ownerId,
+        name,
+        platform: platform ?? 'moltloop',
+        description: description ?? null,
+        llm_provider: llm_provider ?? null,
+        llm_model: llm_model ?? null,
+        homepage_url: homepage_url ?? null,
+        bluesky_handle: bluesky_handle ?? null,
+        api_key_hash: apiKeyHash,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      return errorResponse('INTERNAL_ERROR', `Failed to create agent: ${insertError.message}`, 500);
+    }
+
+    // Insert interest tags
+    if (interest_topics?.length > 0) {
+      const tags = interest_topics.map((tag: string) => ({
+        agent_id: agent.id,
+        tag: tag.trim().toLowerCase(),
+      }));
+      await supabaseService.from('agent_interest_tags').insert(tags);
+    }
+
+    return jsonResponse({ agent, api_key: apiKey }, 201);
+  }
+
+  async function handleUpdateAgent(auth: AuthResult, agentId: string, req: Request): Promise<Response> {
+    // Verify ownership
+    const { data: existing, error: fetchError } = await supabaseService
+      .from('agents')
+      .select('id, owner_id')
+      .eq('id', agentId)
+      .single();
+
+    if (fetchError || !existing) {
+      return errorResponse('NOT_FOUND', 'Agent not found', 404);
+    }
+
+    if (existing.owner_id !== auth.ownerId) {
+      return errorResponse('FORBIDDEN', 'You do not own this agent', 403);
+    }
+
+    const body = await req.json();
+    const allowedFields = ['description', 'avatar_url', 'llm_provider', 'llm_model', 'homepage_url', 'bluesky_handle'];
+    const updatePayload: Record<string, unknown> = {};
+
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) {
+        updatePayload[field] = body[field];
+      }
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      return errorResponse('INVALID_INPUT', 'No valid fields to update');
+    }
+
+    const { data: updated, error: updateError } = await supabaseService
+      .from('agents')
+      .update(updatePayload)
+      .eq('id', agentId)
+      .select()
+      .single();
+
+    if (updateError) {
+      return errorResponse('INTERNAL_ERROR', `Failed to update agent: ${updateError.message}`, 500);
+    }
+
+    return jsonResponse(updated);
+  }
+
+  async function handleVerifyOwnership(auth: AuthResult, agentId: string): Promise<Response> {
+    // Fetch agent
+    const { data: agent, error: fetchError } = await supabaseService
+      .from('agents')
+      .select('*')
+      .eq('id', agentId)
+      .single();
+
+    if (fetchError || !agent) {
+      return errorResponse('NOT_FOUND', 'Agent not found', 404);
+    }
+
+    if (agent.owner_id !== auth.ownerId) {
+      return errorResponse('FORBIDDEN', 'You do not own this agent', 403);
+    }
+
+    if (!agent.bluesky_handle) {
+      return errorResponse('INVALID_INPUT', 'Agent does not have a Bluesky handle configured');
+    }
+
+    // Resolve Bluesky handle and verify claim post
+    const blueskyBase = 'https://public.api.bsky.app';
+    const claimPrefix = 'moltloop-verify:';
+
+    try {
+      // Resolve handle to DID
+      const resolveRes = await fetch(
+        `${blueskyBase}/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(agent.bluesky_handle)}`,
+      );
+      if (!resolveRes.ok) {
+        return errorResponse('VERIFICATION_FAILED', `Could not resolve Bluesky handle: ${agent.bluesky_handle}`, 400);
+      }
+      const { did } = await resolveRes.json();
+
+      // Fetch recent feed
+      const feedRes = await fetch(
+        `${blueskyBase}/xrpc/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(did)}&limit=30`,
+      );
+      if (!feedRes.ok) {
+        return errorResponse('VERIFICATION_FAILED', 'Could not fetch Bluesky feed', 400);
+      }
+      const feedData = await feedRes.json();
+
+      const expectedText = `${claimPrefix}${agent.name}`;
+      const matchingPost = feedData.feed?.find(
+        (item: { post: { record: { text: string }; uri: string } }) =>
+          item.post.record.text.includes(expectedText),
+      );
+
+      if (!matchingPost) {
+        return errorResponse(
+          'VERIFICATION_FAILED',
+          `No claim post found. Post "${expectedText}" on Bluesky to verify.`,
+          400,
+        );
+      }
+
+      // Update agent
+      const { error: updateError } = await supabaseService
+        .from('agents')
+        .update({
+          ownership_verified: true,
+          bluesky_did: did,
+          bluesky_claim_uri: matchingPost.post.uri,
+        })
+        .eq('id', agentId);
+
+      if (updateError) {
+        return errorResponse('INTERNAL_ERROR', 'Failed to update verification status', 500);
+      }
+
+      return jsonResponse({
+        verified: true,
+        did,
+        claim_uri: matchingPost.post.uri,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Verification failed';
+      return errorResponse('VERIFICATION_FAILED', message, 400);
+    }
+  }
+
+  async function handleSetInterestTags(auth: AuthResult, agentId: string, req: Request): Promise<Response> {
+    // Verify ownership
+    const { data: agent, error: fetchError } = await supabaseService
+      .from('agents')
+      .select('id, owner_id')
+      .eq('id', agentId)
+      .single();
+
+    if (fetchError || !agent) {
+      return errorResponse('NOT_FOUND', 'Agent not found', 404);
+    }
+
+    if (agent.owner_id !== auth.ownerId) {
+      return errorResponse('FORBIDDEN', 'You do not own this agent', 403);
+    }
+
+    const body = await req.json();
+    const { tags } = body;
+
+    if (!Array.isArray(tags)) {
+      return errorResponse('INVALID_INPUT', 'tags must be an array of strings');
+    }
+
+    // Validate tags
+    for (const tag of tags) {
+      if (typeof tag !== 'string' || tag.trim().length < 1 || tag.trim().length > 50) {
+        return errorResponse('INVALID_INPUT', 'Each tag must be a string between 1-50 characters');
+      }
+    }
+
+    // Delete existing tags
+    await supabaseService.from('agent_interest_tags').delete().eq('agent_id', agentId);
+
+    // Insert new tags
+    if (tags.length > 0) {
+      const tagRecords = tags.map((tag: string) => ({
+        agent_id: agentId,
+        tag: tag.trim().toLowerCase(),
+      }));
+
+      const { error: insertError } = await supabaseService
+        .from('agent_interest_tags')
+        .insert(tagRecords);
+
+      if (insertError) {
+        return errorResponse('INTERNAL_ERROR', `Failed to set tags: ${insertError.message}`, 500);
+      }
+    }
+
+    return jsonResponse({ agent_id: agentId, tags: tags.map((t: string) => t.trim().toLowerCase()) });
+  }
 });

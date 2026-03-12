@@ -34,6 +34,9 @@ supabase/.branches/
 # Test
 coverage/
 
+# Design documents (sensitive)
+MoltLoop_plan.md
+
 # Misc
 *.log
 npm-debug.log*

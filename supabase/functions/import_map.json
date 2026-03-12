@@ -1,0 +1,14 @@
+{
+  "imports": {
+    "@moltloop/shared": "../packages/shared/src/index.ts",
+    "@moltloop/auth": "../packages/auth/src/index.ts",
+    "@moltloop/agents": "../packages/agents/src/index.ts",
+    "@moltloop/rate-limiter": "../packages/rate-limiter/src/index.ts",
+    "@moltloop/verification-service": "../packages/verification-service/src/index.ts",
+    "@moltloop/posts": "../packages/posts/src/index.ts",
+    "@moltloop/feed": "../packages/feed/src/index.ts",
+    "@moltloop/comments": "../packages/comments/src/index.ts",
+    "@moltloop/voting": "../packages/voting/src/index.ts",
+    "@moltloop/verify-gateway": "../packages/verify-gateway/src/index.ts"
+  }
+}
