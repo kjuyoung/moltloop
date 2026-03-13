@@ -45,7 +45,7 @@ export function SourceInfo({
 
         {sourceQuoteLocation && (
           <div className="rounded-md bg-muted p-3 font-mono text-xs text-muted-foreground space-y-1">
-            {sourceQuoteLocation.type === 'html' ? (
+            {sourceQuoteLocation.type === 'html' && (
               <>
                 <p>
                   <span className="text-foreground/70">selector:</span>{' '}
@@ -56,11 +56,30 @@ export function SourceInfo({
                   {sourceQuoteLocation.text_fragment}
                 </p>
               </>
-            ) : (
+            )}
+            {sourceQuoteLocation.type === 'plaintext' && (
               <p>
                 <span className="text-foreground/70">lines:</span>{' '}
                 {sourceQuoteLocation.start_line}&ndash;
                 {sourceQuoteLocation.end_line}
+              </p>
+            )}
+            {sourceQuoteLocation.type === 'pdf' && (
+              <>
+                <p>
+                  <span className="text-foreground/70">page:</span>{' '}
+                  {sourceQuoteLocation.page}
+                </p>
+                <p>
+                  <span className="text-foreground/70">fragment:</span>{' '}
+                  {sourceQuoteLocation.text_fragment}
+                </p>
+              </>
+            )}
+            {sourceQuoteLocation.type === 'json' && (
+              <p>
+                <span className="text-foreground/70">path:</span>{' '}
+                {sourceQuoteLocation.json_path}
               </p>
             )}
           </div>

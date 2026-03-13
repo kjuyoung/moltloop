@@ -10,6 +10,8 @@ import type {
   SourceQuoteLocation,
   HtmlQuoteLocation,
   PlaintextQuoteLocation,
+  PdfQuoteLocation,
+  JsonQuoteLocation,
 } from '@moltloop/shared';
 
 export interface QuoteMatchOk {
@@ -143,10 +145,136 @@ function matchPlaintextQuote(
 }
 
 /**
+ * Match a quote in a PDF document using page number and text fragment.
+ * PDF text is expected to be pre-extracted (plain text representation).
+ */
+function matchPdfQuote(body: string, location: PdfQuoteLocation): QuoteMatchResult {
+  const { page, text_fragment } = location;
+
+  if (!text_fragment || text_fragment.trim().length === 0) {
+    return { matched: false, reason: 'Empty text_fragment' };
+  }
+
+  if (page < 1) {
+    return { matched: false, reason: 'page must be >= 1' };
+  }
+
+  // PDF text is extracted as plain text with page breaks marked as \f (form feed)
+  const pages = body.split('\f');
+
+  if (page > pages.length) {
+    return {
+      matched: false,
+      reason: `page ${page} exceeds document length (${pages.length} pages)`,
+    };
+  }
+
+  const pageText = pages[page - 1];
+  const normalizedPage = normalizeWhitespace(pageText);
+  const normalizedFragment = normalizeWhitespace(text_fragment);
+
+  if (normalizedPage.includes(normalizedFragment)) {
+    const idx = normalizedPage.indexOf(normalizedFragment);
+    const extractedText = normalizedPage.slice(idx, idx + normalizedFragment.length);
+    return { matched: true, extractedText };
+  }
+
+  // Case-insensitive fallback
+  const lowerPage = normalizedPage.toLowerCase();
+  const lowerFragment = normalizedFragment.toLowerCase();
+
+  if (lowerPage.includes(lowerFragment)) {
+    const idx = lowerPage.indexOf(lowerFragment);
+    const extractedText = normalizedPage.slice(idx, idx + normalizedFragment.length);
+    return { matched: true, extractedText };
+  }
+
+  return {
+    matched: false,
+    reason: 'text_fragment not found on specified page',
+  };
+}
+
+/**
+ * Match a quote in a JSON document using a JSON path expression.
+ * Supports basic dot-notation and array indexing: $.data.results[0].summary
+ */
+function matchJsonQuote(body: string, location: JsonQuoteLocation): QuoteMatchResult {
+  const { json_path } = location;
+
+  if (!json_path || json_path.trim().length === 0) {
+    return { matched: false, reason: 'Empty json_path' };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return { matched: false, reason: 'Invalid JSON document' };
+  }
+
+  // Parse JSON path: $.data.results[0].summary
+  // Use matchAll to properly extract dot-separated keys and bracket indices
+  const stripped = json_path.replace(/^\$\.?/, '');
+  const pathParts: string[] = [];
+  const tokenRegex = /\[(\d+)\]|([^.\[\]]+)/g;
+  let tokenMatch: RegExpExecArray | null;
+  while ((tokenMatch = tokenRegex.exec(stripped)) !== null) {
+    pathParts.push(tokenMatch[1] ?? tokenMatch[2]);
+  }
+
+  if (pathParts.length === 0) {
+    return { matched: false, reason: 'Empty JSON path after parsing' };
+  }
+
+  let current: unknown = parsed;
+
+  for (const part of pathParts) {
+    if (current === null || current === undefined) {
+      return {
+        matched: false,
+        reason: `Path "${json_path}" resolved to null at segment "${part}"`,
+      };
+    }
+
+    if (Array.isArray(current)) {
+      const idx = parseInt(part, 10);
+      if (isNaN(idx) || idx < 0 || idx >= current.length) {
+        return {
+          matched: false,
+          reason: `Array index ${part} out of bounds (length: ${current.length})`,
+        };
+      }
+      current = current[idx];
+    } else if (typeof current === 'object') {
+      current = (current as Record<string, unknown>)[part];
+    } else {
+      return {
+        matched: false,
+        reason: `Cannot access property "${part}" on ${typeof current}`,
+      };
+    }
+  }
+
+  if (current === null || current === undefined) {
+    return {
+      matched: false,
+      reason: `Path "${json_path}" resolved to ${current}`,
+    };
+  }
+
+  const extractedText = typeof current === 'string' ? current : JSON.stringify(current);
+
+  return { matched: true, extractedText };
+}
+
+/**
  * Match a quoted content fragment against a fetched source body.
  *
  * For HTML sources, strips tags and searches for the text_fragment.
  * For plaintext sources, extracts the specified line range.
+ * For PDF sources, searches for text_fragment on the specified page.
+ * For JSON sources, extracts the value at the specified JSON path.
  */
 export function matchQuote(
   body: string,
@@ -159,6 +287,14 @@ export function matchQuote(
 
   if (contentType === 'text/plain' && quoteLocation.type === 'plaintext') {
     return matchPlaintextQuote(body, quoteLocation);
+  }
+
+  if (contentType === 'application/pdf' && quoteLocation.type === 'pdf') {
+    return matchPdfQuote(body, quoteLocation);
+  }
+
+  if (contentType === 'application/json' && quoteLocation.type === 'json') {
+    return matchJsonQuote(body, quoteLocation);
   }
 
   return {

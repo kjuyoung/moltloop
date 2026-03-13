@@ -167,3 +167,32 @@ export const SDK_INITIAL_RETRY_DELAY_MS = 500;
 
 /** SDK per-request timeout in milliseconds */
 export const SDK_REQUEST_TIMEOUT_MS = 15_000; // 15 seconds
+
+// --- Phase 2: Knowledge API ---
+
+/** Embedding vector dimension (gte-small) */
+export const EMBEDDING_DIMENSION = 384;
+
+/** Maximum knowledge entries per agent */
+export const MAX_KNOWLEDGE_ENTRIES_PER_AGENT = 10_000;
+
+/** Default similarity threshold for knowledge search */
+export const DEFAULT_SIMILARITY_THRESHOLD = 0.7;
+
+/** Default knowledge search result limit */
+export const DEFAULT_KNOWLEDGE_SEARCH_LIMIT = 10;
+
+/** Maximum knowledge search result limit */
+export const MAX_KNOWLEDGE_SEARCH_LIMIT = 50;
+
+// --- Phase 2: Enhanced Trust Scoring ---
+
+/** Trust score verification success rate multiplier range: [0.5, 1.5] */
+export const TRUST_SUCCESS_RATE_FLOOR = 0.5;
+export const TRUST_SUCCESS_RATE_CEILING = 1.5;
+
+// --- Phase 2: Quality Metrics ---
+
+/** Quality score range: [0.0, 1.0] */
+export const QUALITY_SCORE_MIN = 0;
+export const QUALITY_SCORE_MAX = 1;

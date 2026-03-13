@@ -17,6 +17,14 @@ import { sanitize } from '@moltloop/sanitizer';
 
 import { HttpClient, HttpError } from './http-client';
 
+/** Options for Knowledge API integration during learning. */
+interface KnowledgeOptions {
+  /** If true, also store learned content as a vector embedding for semantic search. */
+  storeEmbedding?: boolean;
+  /** If true, record quality metrics before and after learning. */
+  trackQuality?: boolean;
+}
+
 /** Response shape returned by POST /verify. */
 interface VerifyResponse {
   post_id: string;
@@ -146,8 +154,10 @@ export class MoltLoopClient {
    * 2. POST /api/learn/start — transition verified -> learning_pending
    * 3. Write block to memory.md
    * 4. POST /ack/learn       — acknowledge success or failure
+   * 5. (Optional) Store knowledge embedding for semantic search
+   * 6. (Optional) Record quality metrics
    */
-  async learn(postId: string): Promise<LearnResult> {
+  async learn(postId: string, options?: KnowledgeOptions): Promise<LearnResult> {
     this.assertInitialized();
 
     // Step 1: Verify the post
@@ -219,6 +229,13 @@ export class MoltLoopClient {
       };
     }
 
+    // Phase 2: Record pre-learn quality snapshot (best-effort)
+    if (options?.trackQuality) {
+      this.recordQualitySnapshot(postId, attempt_no, 'pre_learn').catch(() => {
+        // Best-effort: quality tracking failure should not fail the learn
+      });
+    }
+
     // Step 3: Write the learned block to memory.md
     const block: LearnedBlock = {
       post_id: postId,
@@ -254,6 +271,20 @@ export class MoltLoopClient {
       );
 
       if (writeSuccess) {
+        // Phase 2: Store knowledge embedding (best-effort, non-blocking)
+        if (options?.storeEmbedding) {
+          this.storeKnowledgeEmbedding(postId, attempt_no, sanitizeResult.content, source_url ?? '').catch(() => {
+            // Best-effort: embedding storage failure should not fail the learn
+          });
+        }
+
+        // Phase 2: Record post-learn quality snapshot (best-effort)
+        if (options?.trackQuality) {
+          this.recordQualitySnapshot(postId, attempt_no, 'post_learn').catch(() => {
+            // Best-effort: quality tracking failure should not fail the learn
+          });
+        }
+
         return {
           success: true,
           post_id: postId,
@@ -382,5 +413,50 @@ export class MoltLoopClient {
         'MoltLoopClient is not initialized. Call init() before learn() or rollback().',
       );
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Phase 2: Knowledge API integration
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Store a knowledge embedding for semantic search.
+   * Generates an embedding via the server and stores it in the knowledge base.
+   */
+  private async storeKnowledgeEmbedding(
+    postId: string,
+    attemptNo: number,
+    content: string,
+    sourceUrl: string,
+  ): Promise<void> {
+    // Step 1: Generate embedding
+    const embedResponse = await this.http.request<{ embedding: number[] }>(
+      '/knowledge/embed',
+      { text: content },
+    );
+
+    // Step 2: Store with embedding
+    await this.http.request('/knowledge/store', {
+      post_id: postId,
+      attempt_no: attemptNo,
+      content,
+      source_url: sourceUrl,
+      embedding: embedResponse.embedding,
+    });
+  }
+
+  /**
+   * Record a quality snapshot for learning quality measurement.
+   */
+  private async recordQualitySnapshot(
+    postId: string,
+    attemptNo: number,
+    snapshotType: 'pre_learn' | 'post_learn',
+  ): Promise<void> {
+    await this.http.request('/api/quality/record', {
+      post_id: postId,
+      attempt_no: attemptNo,
+      snapshot_type: snapshotType,
+    });
   }
 }

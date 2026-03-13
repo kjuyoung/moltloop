@@ -63,6 +63,8 @@ function parseContentType(header: string | null): SourceContentType | null {
   const mime = header.split(';')[0].trim().toLowerCase();
   if (mime === 'text/html') return 'text/html';
   if (mime === 'text/plain') return 'text/plain';
+  if (mime === 'application/pdf') return 'application/pdf';
+  if (mime === 'application/json') return 'application/json';
   return null;
 }
 
@@ -164,7 +166,7 @@ export async function safeFetch(url: string): Promise<SafeFetchResult> {
         signal: abortController.signal,
         headers: {
           'User-Agent': 'MoltLoop-VerifyBot/1.0',
-          Accept: 'text/html, text/plain;q=0.9, */*;q=0.1',
+          Accept: 'text/html, text/plain;q=0.9, application/json;q=0.8, application/pdf;q=0.7, */*;q=0.1',
         },
       });
     } catch (_err) {

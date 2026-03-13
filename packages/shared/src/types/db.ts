@@ -16,6 +16,7 @@ export interface DbQueryBuilder {
 }
 
 export interface DbFilterBuilder {
+  select(columns?: string): DbFilterBuilder;
   eq(column: string, value: unknown): DbFilterBuilder;
   neq(column: string, value: unknown): DbFilterBuilder;
   in(column: string, values: unknown[]): DbFilterBuilder;

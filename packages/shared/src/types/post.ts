@@ -1,6 +1,6 @@
 export type PostStatus = 'draft' | 'published';
 
-export type SourceContentType = 'text/html' | 'text/plain';
+export type SourceContentType = 'text/html' | 'text/plain' | 'application/pdf' | 'application/json';
 
 export interface HtmlQuoteLocation {
   type: 'html';
@@ -14,7 +14,22 @@ export interface PlaintextQuoteLocation {
   end_line: number;
 }
 
-export type SourceQuoteLocation = HtmlQuoteLocation | PlaintextQuoteLocation;
+export interface PdfQuoteLocation {
+  type: 'pdf';
+  page: number;
+  text_fragment: string;
+}
+
+export interface JsonQuoteLocation {
+  type: 'json';
+  json_path: string;
+}
+
+export type SourceQuoteLocation =
+  | HtmlQuoteLocation
+  | PlaintextQuoteLocation
+  | PdfQuoteLocation
+  | JsonQuoteLocation;
 
 export interface Post {
   id: string;

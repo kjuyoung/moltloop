@@ -289,6 +289,27 @@ Deno.serve(async (req) => {
       return await handleRemoveVote(auth, voteDeleteMatch[1]);
     }
 
+    // --- Phase 2: Trust Score endpoints ---
+
+    // GET /agents/:id/trust-score — Get enhanced trust score
+    const trustScoreMatch = path.match(/^\/agents\/([0-9a-f-]{36})\/trust-score$/);
+    if (method === 'GET' && trustScoreMatch) {
+      return await handleGetTrustScore(trustScoreMatch[1]);
+    }
+
+    // --- Phase 2: Quality recording endpoints ---
+
+    // POST /quality/record — Record a quality snapshot
+    if (method === 'POST' && path === '/quality/record') {
+      return await handleRecordQuality(auth, req);
+    }
+
+    // GET /agents/:id/quality-trend — Get quality improvement trend
+    const qualityTrendMatch = path.match(/^\/agents\/([0-9a-f-]{36})\/quality-trend$/);
+    if (method === 'GET' && qualityTrendMatch) {
+      return await handleGetQualityTrend(auth, qualityTrendMatch[1]);
+    }
+
     return errorResponse('NOT_FOUND', `Route not found: ${method} ${path}`, 404);
   } catch (err) {
     // Handle structured errors from requireAgentId
@@ -1085,6 +1106,103 @@ Deno.serve(async (req) => {
       return jsonResponse({ removed: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to remove vote';
+      return errorResponse('INTERNAL_ERROR', message, 500);
+    }
+  }
+
+  // --- Phase 2: Trust Score Handler ---
+
+  async function handleGetTrustScore(agentId: string): Promise<Response> {
+    try {
+      const { data: score, error } = await supabaseService.rpc('recalculate_trust_score', {
+        p_agent_id: agentId,
+      });
+
+      if (error) {
+        return errorResponse('INTERNAL_ERROR', `Failed to calculate trust score: ${error.message}`, 500);
+      }
+
+      // Fetch the full trust score record
+      const { data: record, error: fetchError } = await supabaseService
+        .from('agent_trust_scores')
+        .select('*')
+        .eq('agent_id', agentId)
+        .single();
+
+      if (fetchError || !record) {
+        return jsonResponse({ agent_id: agentId, trust_score: score ?? 1 });
+      }
+
+      return jsonResponse(record);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to get trust score';
+      return errorResponse('INTERNAL_ERROR', message, 500);
+    }
+  }
+
+  // --- Phase 2: Quality Handlers ---
+
+  async function handleRecordQuality(auth: AuthResult, req: Request): Promise<Response> {
+    const agentId = requireAgentId(auth);
+    const body = await req.json();
+    const { post_id, attempt_no, snapshot_type, relevance_score, source_fidelity_score, metadata } = body;
+
+    if (!post_id || attempt_no === undefined || !snapshot_type) {
+      return errorResponse('INVALID_INPUT', 'post_id, attempt_no, and snapshot_type are required');
+    }
+
+    if (snapshot_type !== 'pre_learn' && snapshot_type !== 'post_learn') {
+      return errorResponse('INVALID_INPUT', 'snapshot_type must be "pre_learn" or "post_learn"');
+    }
+
+    try {
+      const { data, error } = await supabaseService
+        .from('learning_quality_snapshots')
+        .insert({
+          agent_id: agentId,
+          post_id,
+          attempt_no,
+          snapshot_type,
+          relevance_score: relevance_score ?? null,
+          source_fidelity_score: source_fidelity_score ?? null,
+          metadata: metadata ?? {},
+        })
+        .select('*')
+        .single();
+
+      if (error) {
+        return errorResponse('INTERNAL_ERROR', `Failed to record quality: ${error.message}`, 500);
+      }
+
+      return jsonResponse(data, 201);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to record quality';
+      return errorResponse('INTERNAL_ERROR', message, 500);
+    }
+  }
+
+  async function handleGetQualityTrend(auth: AuthResult, agentId: string): Promise<Response> {
+    // Only allow the agent owner or admin to view
+    if (auth.agentId !== agentId) {
+      return errorResponse('FORBIDDEN', 'Cannot view quality trend for another agent', 403);
+    }
+
+    const limitStr = url.searchParams.get('limit');
+    const limit = limitStr ? Math.min(Math.max(1, parseInt(limitStr, 10)), 100) : 20;
+
+    try {
+      const { data, error } = await supabaseService.rpc('get_learning_quality_trend', {
+        p_agent_id: agentId,
+        p_limit: limit,
+      });
+
+      if (error) {
+        return errorResponse('INTERNAL_ERROR', `Failed to get quality trend: ${error.message}`, 500);
+      }
+
+      return jsonResponse(data ?? []);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to get quality trend';
       return errorResponse('INTERNAL_ERROR', message, 500);
     }
   }
