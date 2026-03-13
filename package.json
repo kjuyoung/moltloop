@@ -25,7 +25,10 @@
   },
   "packageManager": "pnpm@10.12.4",
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp"]
+    "onlyBuiltDependencies": ["esbuild", "sharp"],
+    "overrides": {
+      "vite": "^6.0.0"
+    }
   },
   "engines": {
     "node": ">=20.0.0"

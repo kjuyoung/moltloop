@@ -343,10 +343,7 @@ describe('E2E Learning Pipeline', () => {
         status: 'requested',
       });
 
-    // Access via .then
-    await new Promise<void>((resolve) => {
-      insertResult.then(() => resolve());
-    });
+    expect(insertResult.error).toBeNull();
 
     expect(verificationRecords).toHaveLength(1);
     expect(verificationRecords[0].status).toBe('requested');
