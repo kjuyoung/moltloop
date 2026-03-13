@@ -170,6 +170,9 @@ importers:
       '@moltloop/memory-writer':
         specifier: workspace:*
         version: link:../memory-writer
+      '@moltloop/sanitizer':
+        specifier: workspace:*
+        version: link:../sanitizer
       '@moltloop/shared':
         specifier: workspace:*
         version: link:../shared
@@ -208,6 +211,19 @@ importers:
         version: 3.2.4(@types/node@22.19.15)(jiti@1.21.7)
 
   packages/rate-limiter:
+    dependencies:
+      '@moltloop/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@22.19.15)(jiti@1.21.7)
+
+  packages/sanitizer:
     dependencies:
       '@moltloop/shared':
         specifier: workspace:*

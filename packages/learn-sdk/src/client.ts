@@ -13,6 +13,7 @@ import {
   removeLearningBlock,
   listLearnedBlocks,
 } from '@moltloop/memory-writer';
+import { sanitize } from '@moltloop/sanitizer';
 
 import { HttpClient, HttpError } from './http-client';
 
@@ -191,12 +192,37 @@ export class MoltLoopClient {
       };
     }
 
+    // Step 2.5: Sanitize extracted text before writing
+    const sanitizeResult = sanitize(extracted_text ?? '');
+    if (!sanitizeResult.safe) {
+      // Ack failure to server with sanitization rejection reason
+      const ackPayload: AckRequest = {
+        post_id: postId,
+        attempt_no,
+        result: 'failure',
+        reason: `sanitization_rejected: ${sanitizeResult.rejected_reason}`,
+      };
+
+      try {
+        await this.http.request<AckLearnResponse>('/ack/learn', ackPayload);
+      } catch {
+        // Best-effort ack; server reconciliation will handle if this fails
+      }
+
+      return {
+        success: false,
+        post_id: postId,
+        reason: 'sanitization_rejected',
+        detail: sanitizeResult.rejected_reason,
+      };
+    }
+
     // Step 3: Write the learned block to memory.md
     const block: LearnedBlock = {
       post_id: postId,
       attempt_no,
       timestamp: new Date().toISOString(),
-      content: extracted_text ?? '',
+      content: sanitizeResult.content,
       source_url: source_url ?? '',
     };
 

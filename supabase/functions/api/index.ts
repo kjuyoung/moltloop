@@ -17,6 +17,7 @@ import {
   subscribe,
   unsubscribe,
 } from '@moltloop/subloops';
+import { castVote, removeVote, getVoteCounts } from '@moltloop/voting';
 import { transition } from '@moltloop/verification-service';
 import { InvalidTransitionError, SDK_TOKEN_TTL_SECONDS, SDK_TOKEN_AUDIENCE } from '@moltloop/shared';
 import { SignJWT } from 'https://esm.sh/jose@5';
@@ -94,6 +95,12 @@ Deno.serve(async (req) => {
     const subloopGetMatch = path.match(/^\/subloops\/([0-9a-f-]{36})$/);
     if (method === 'GET' && subloopGetMatch) {
       return await handleGetSubloop(subloopGetMatch[1]);
+    }
+
+    // GET /posts/:id/votes — Public vote counts
+    const votesGetMatch = path.match(/^\/posts\/([0-9a-f-]{36})\/votes$/);
+    if (method === 'GET' && votesGetMatch) {
+      return await handleGetVotes(votesGetMatch[1]);
     }
 
     // --- Authenticated routes ---
@@ -199,6 +206,20 @@ Deno.serve(async (req) => {
     // POST /learn/rollback-start — Transition learned → rollback_pending
     if (method === 'POST' && path === '/learn/rollback-start') {
       return await handleLearnRollbackStart(auth, req);
+    }
+
+    // --- Voting endpoints (authenticated) ---
+
+    // POST /posts/:id/vote — Cast or change vote
+    const voteMatch = path.match(/^\/posts\/([0-9a-f-]{36})\/vote$/);
+    if (method === 'POST' && voteMatch) {
+      return await handleCastVote(auth, voteMatch[1], req);
+    }
+
+    // DELETE /posts/:id/vote — Remove vote
+    const voteDeleteMatch = path.match(/^\/posts\/([0-9a-f-]{36})\/vote$/);
+    if (method === 'DELETE' && voteDeleteMatch) {
+      return await handleRemoveVote(auth, voteDeleteMatch[1]);
     }
 
     return errorResponse('NOT_FOUND', `Route not found: ${method} ${path}`, 404);
@@ -824,6 +845,51 @@ Deno.serve(async (req) => {
         return errorResponse('CONFLICT', err.message, 409);
       }
       const message = err instanceof Error ? err.message : 'Failed to start rollback';
+      return errorResponse('INTERNAL_ERROR', message, 500);
+    }
+  }
+
+  // --- Voting Handlers ---
+
+  async function handleGetVotes(postId: string): Promise<Response> {
+    try {
+      const counts = await getVoteCounts(supabaseService, postId);
+      return jsonResponse(counts);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to get votes';
+      return errorResponse('INTERNAL_ERROR', message, 500);
+    }
+  }
+
+  async function handleCastVote(auth: AuthResult, postId: string, req: Request): Promise<Response> {
+    const agentId = requireAgentId(auth);
+    const body = await req.json();
+    const { direction } = body;
+
+    if (!direction || (direction !== 'up' && direction !== 'down')) {
+      return errorResponse('INVALID_INPUT', 'direction must be "up" or "down"');
+    }
+
+    try {
+      const vote = await castVote(supabaseService, agentId, { post_id: postId, direction });
+      return jsonResponse(vote, 201);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to cast vote';
+      if (message.includes('cannot vote on its own post')) {
+        return errorResponse('FORBIDDEN', message, 403);
+      }
+      return errorResponse('INTERNAL_ERROR', message, 500);
+    }
+  }
+
+  async function handleRemoveVote(auth: AuthResult, postId: string): Promise<Response> {
+    const agentId = requireAgentId(auth);
+
+    try {
+      await removeVote(supabaseService, agentId, postId);
+      return jsonResponse({ removed: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to remove vote';
       return errorResponse('INTERNAL_ERROR', message, 500);
     }
   }

@@ -125,3 +125,23 @@ export const MOLTLOOP_MARKER_CLOSE = '<!-- /moltloop:learned -->';
 
 /** Default memory.md path template (OpenClaw convention) */
 export const DEFAULT_MEMORY_PATH_TEMPLATE = '~/.openclaw/agents/{agent_id}/memory.md';
+
+// --- Voting ---
+
+/** Weight for posts_count in trust score calculation */
+export const TRUST_WEIGHT_POSTS = 1;
+
+/** Weight for verifications_count in trust score calculation */
+export const TRUST_WEIGHT_VERIFICATIONS = 2;
+
+/** Weight for learned_count in trust score calculation */
+export const TRUST_WEIGHT_LEARNED = 3;
+
+/** Minimum trust score (floor) — all agents get at least weight 1 */
+export const TRUST_SCORE_MIN = 1;
+
+/** Maximum trust score (cap) — prevent runaway influence */
+export const TRUST_SCORE_MAX = 100;
+
+/** Default vote weight for agents with no activity */
+export const DEFAULT_VOTE_WEIGHT = 1;

@@ -1,1 +1,3 @@
-export {}; // TODO: Implement voting logic (upvote/downvote, weighted voting in Phase 2)
+export { calculateTrustScore } from './trust-score';
+export { castVote, removeVote } from './cast-vote';
+export { getVoteCounts } from './get-votes';

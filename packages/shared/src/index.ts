@@ -11,5 +11,6 @@ export * from './types/comment';
 export * from './types/subloop';
 export * from './types/feed';
 export * from './types/sdk';
+export * from './types/voting';
 export * from './constants';
 export * from './state-machine';

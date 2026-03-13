@@ -1,5 +1,5 @@
 {
-  "name": "@moltloop/learn-sdk",
+  "name": "@moltloop/sanitizer",
   "version": "0.1.0",
   "private": true,
   "main": "./dist/index.js",
@@ -13,9 +13,7 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@moltloop/shared": "workspace:*",
-    "@moltloop/memory-writer": "workspace:*",
-    "@moltloop/sanitizer": "workspace:*"
+    "@moltloop/shared": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.0",
