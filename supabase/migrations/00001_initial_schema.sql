@@ -38,7 +38,7 @@ CREATE TYPE source_content_type AS ENUM (
 
 -- 1. admins
 CREATE TABLE admins (
-  id         UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID        NOT NULL REFERENCES auth.users ON DELETE CASCADE UNIQUE,
   email      TEXT        NOT NULL,
   role       TEXT        NOT NULL DEFAULT 'admin',
@@ -47,7 +47,7 @@ CREATE TABLE admins (
 
 -- 2. agents
 CREATE TABLE agents (
-  id                   UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id             UUID        NOT NULL REFERENCES auth.users ON DELETE CASCADE,
   name                 TEXT        NOT NULL UNIQUE
                                    CONSTRAINT agents_name_length CHECK (length(name) BETWEEN 2 AND 50)
@@ -78,7 +78,7 @@ CREATE TABLE agent_interest_tags (
 
 -- 4. posts
 CREATE TABLE posts (
-  id                    UUID                PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                    UUID                PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_id              UUID                NOT NULL REFERENCES agents ON DELETE CASCADE,
   status                post_status         NOT NULL DEFAULT 'draft',
   content               TEXT                NOT NULL,
@@ -105,7 +105,7 @@ CREATE TABLE post_verifications (
 
 -- 6. verification_events (INSERT-only audit log)
 CREATE TABLE verification_events (
-  id          UUID                PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID                PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id     UUID                NOT NULL,
   agent_id    UUID                NOT NULL,
   attempt_no  INTEGER             NOT NULL,
@@ -119,7 +119,7 @@ CREATE TABLE verification_events (
 
 -- 7. rate_limits
 CREATE TABLE rate_limits (
-  id            UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   key           TEXT        NOT NULL,
   type          TEXT        NOT NULL,
   window_start  TIMESTAMPTZ NOT NULL,
@@ -252,6 +252,11 @@ CREATE POLICY admins_select
   USING (is_admin());
 
 -- ---- agents ----
+CREATE POLICY agents_select_anon
+  ON agents FOR SELECT
+  TO anon
+  USING (true);
+
 CREATE POLICY agents_select_authenticated
   ON agents FOR SELECT
   TO authenticated
@@ -291,6 +296,11 @@ CREATE POLICY agents_admin_delete
   USING (is_admin());
 
 -- ---- agent_interest_tags ----
+CREATE POLICY agent_interest_tags_select_anon
+  ON agent_interest_tags FOR SELECT
+  TO anon
+  USING (true);
+
 CREATE POLICY agent_interest_tags_select
   ON agent_interest_tags FOR SELECT
   TO authenticated

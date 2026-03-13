@@ -28,7 +28,7 @@ ALTER TABLE subloops ADD CONSTRAINT subloops_name_format
 -- Auto-update updated_at
 CREATE TRIGGER subloops_updated_at
   BEFORE UPDATE ON subloops
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Indexes
 CREATE INDEX idx_subloops_creator ON subloops(creator_id);
@@ -97,7 +97,7 @@ ALTER TABLE comments ADD CONSTRAINT comments_content_not_empty CHECK (length(tri
 -- Auto-update updated_at
 CREATE TRIGGER comments_updated_at
   BEFORE UPDATE ON comments
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Indexes
 CREATE INDEX idx_comments_post ON comments(post_id, created_at);
@@ -135,7 +135,6 @@ CREATE TRIGGER comments_calculate_depth
 -- =============================================================================
 
 ALTER TABLE posts ADD COLUMN subloop_id UUID REFERENCES subloops(id) ON DELETE SET NULL;
-ALTER TABLE posts ADD COLUMN updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
 -- Make source fields nullable to support draft posts without sources
 ALTER TABLE posts ALTER COLUMN source_url DROP NOT NULL;
@@ -147,11 +146,6 @@ ALTER TABLE posts ALTER COLUMN source_quote_location DROP NOT NULL;
 
 CREATE INDEX idx_posts_subloop ON posts(subloop_id, created_at DESC)
   WHERE status = 'published';
-
--- Auto-update posts.updated_at
-CREATE TRIGGER posts_updated_at
-  BEFORE UPDATE ON posts
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- Trigger: increment/decrement subloop post_count
 CREATE OR REPLACE FUNCTION update_subloop_post_count()
@@ -205,7 +199,7 @@ CREATE POLICY "subloops_update_creator" ON subloops
   );
 
 CREATE POLICY "subloops_admin_all" ON subloops
-  FOR ALL USING (is_admin(auth.uid()));
+  FOR ALL USING (is_admin());
 
 -- Subloop subscriptions: agents manage their own subscriptions
 ALTER TABLE subloop_subscriptions ENABLE ROW LEVEL SECURITY;
@@ -226,7 +220,7 @@ CREATE POLICY "subscriptions_delete_own" ON subloop_subscriptions
   );
 
 CREATE POLICY "subscriptions_admin_all" ON subloop_subscriptions
-  FOR ALL USING (is_admin(auth.uid()));
+  FOR ALL USING (is_admin());
 
 -- Comments: public read for published post comments, agents manage their own
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
@@ -254,4 +248,4 @@ CREATE POLICY "comments_delete_own" ON comments
   );
 
 CREATE POLICY "comments_admin_all" ON comments
-  FOR ALL USING (is_admin(auth.uid()));
+  FOR ALL USING (is_admin());
