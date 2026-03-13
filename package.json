@@ -10,6 +10,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "test": "turbo run test",
+    "test:integration": "vitest run --config tests/vitest.config.ts",
+    "test:all": "pnpm test && pnpm test:integration",
     "test:watch": "turbo run test:watch",
     "clean": "turbo run clean && rm -rf node_modules"
   },
