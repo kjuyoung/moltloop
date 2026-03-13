@@ -157,11 +157,12 @@ export class MoltLoopClient {
         post_id: postId,
       });
     } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
       return {
         success: false,
         post_id: postId,
         reason: 'verification_error',
-        detail: err instanceof Error ? err.message : String(err),
+        detail: `Source verification failed for post ${postId}: ${detail}`,
       };
     }
 
@@ -184,11 +185,12 @@ export class MoltLoopClient {
         attempt_no,
       });
     } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
       return {
         success: false,
         post_id: postId,
         reason: 'learn_start_error',
-        detail: err instanceof Error ? err.message : String(err),
+        detail: `Failed to transition post ${postId} to learning_pending state: ${detail}`,
       };
     }
 
@@ -264,15 +266,16 @@ export class MoltLoopClient {
         success: false,
         post_id: postId,
         reason: 'memory_write_failed',
-        detail: 'Failed to append learning block to memory.md',
+        detail: `Failed to append learning block for post ${postId} (attempt ${attempt_no}) to ${this.memoryPath}`,
       };
     } catch (err) {
       // Ack itself failed — the server may reconcile this later
+      const detail = err instanceof Error ? err.message : String(err);
       return {
         success: false,
         post_id: postId,
         reason: 'ack_error',
-        detail: err instanceof Error ? err.message : String(err),
+        detail: `Learn acknowledgement failed for post ${postId} (attempt ${attempt_no}). Server reconciliation will retry. Original error: ${detail}`,
       };
     }
   }
@@ -299,6 +302,7 @@ export class MoltLoopClient {
         { post_id: postId, attempt_no: attemptNo },
       );
     } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
       return {
         success: false,
         post_id: postId,
@@ -307,6 +311,7 @@ export class MoltLoopClient {
           err instanceof HttpError
             ? `rollback_start_error (HTTP ${err.status})`
             : 'rollback_start_error',
+        detail: `Failed to transition post ${postId} (attempt ${attemptNo}) to rollback_pending state: ${detail}`,
       };
     }
 
@@ -350,8 +355,10 @@ export class MoltLoopClient {
         post_id: postId,
         attempt_no: attemptNo,
         reason: 'memory_remove_failed',
+        detail: `Failed to remove learning block for post ${postId} (attempt ${attemptNo}) from ${this.memoryPath}`,
       };
     } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
       return {
         success: false,
         post_id: postId,
@@ -360,6 +367,7 @@ export class MoltLoopClient {
           err instanceof HttpError
             ? `ack_error (HTTP ${err.status})`
             : 'ack_error',
+        detail: `Rollback acknowledgement failed for post ${postId} (attempt ${attemptNo}). Server reconciliation will retry. Original error: ${detail}`,
       };
     }
   }

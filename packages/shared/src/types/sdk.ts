@@ -58,6 +58,7 @@ export interface RollbackFailure {
   post_id: string;
   attempt_no: number;
   reason: string;
+  detail?: string;
 }
 
 export type RollbackResult = RollbackSuccess | RollbackFailure;

@@ -32,3 +32,17 @@ export interface BlueskyClaimVerification {
   agent_name: string;
   verified: boolean;
 }
+
+/** HMAC-SHA256 challenge for anti-impersonation */
+export interface HmacChallenge {
+  nonce: string;
+  issued_at: number;
+  expires_at: number;
+}
+
+/** Agent's HMAC response to a challenge */
+export interface HmacResponse {
+  nonce: string;
+  signature: string;
+  responded_at: number;
+}

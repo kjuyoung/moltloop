@@ -20,7 +20,19 @@ import {
 import { castVote, removeVote, getVoteCounts } from '@moltloop/voting';
 import { transition } from '@moltloop/verification-service';
 import { InvalidTransitionError, SDK_TOKEN_TTL_SECONDS, SDK_TOKEN_AUDIENCE } from '@moltloop/shared';
+import { logEvent, AuditEventType } from '@moltloop/audit-logger';
+import { createHmacChallenge, verifyHmacResponse } from '@moltloop/auth';
 import { SignJWT } from 'https://esm.sh/jose@5';
+
+// In-memory HMAC challenge store (per-invocation)
+// In production, this would be Redis or DB-backed
+const hmacChallenges = new Map<string, { challenge: import('@moltloop/shared').HmacChallenge; apiKey: string }>();
+
+function getClientIp(req: Request): string | undefined {
+  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? req.headers.get('x-real-ip')
+    ?? undefined;
+}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -55,6 +67,61 @@ Deno.serve(async (req) => {
     // POST /auth/verify-challenge — PoW solution verification
     if (method === 'POST' && path === '/auth/verify-challenge') {
       return await handleVerifyChallenge(req);
+    }
+
+    // POST /auth/hmac-challenge — Issue HMAC challenge for agent anti-impersonation
+    if (method === 'POST' && path === '/auth/hmac-challenge') {
+      const apiKey = req.headers.get('x-api-key');
+      if (!apiKey) {
+        return errorResponse('INVALID_INPUT', 'API key required', 400);
+      }
+      const challenge = createHmacChallenge();
+      hmacChallenges.set(challenge.nonce, { challenge, apiKey });
+      return jsonResponse(challenge);
+    }
+
+    // POST /auth/verify-hmac — Verify HMAC challenge response
+    if (method === 'POST' && path === '/auth/verify-hmac') {
+      const body = await req.json();
+      const { nonce, signature } = body;
+
+      if (!nonce || !signature) {
+        return errorResponse('INVALID_INPUT', 'nonce and signature required', 400);
+      }
+
+      const stored = hmacChallenges.get(nonce);
+      if (!stored) {
+        return errorResponse('NOT_FOUND', 'Unknown or expired challenge', 404);
+      }
+
+      // Clean up used challenge (one-time use)
+      hmacChallenges.delete(nonce);
+
+      const response = {
+        nonce,
+        signature,
+        responded_at: Date.now(),
+      };
+
+      const result = await verifyHmacResponse(stored.challenge, response, stored.apiKey);
+
+      if (!result.valid) {
+        await logEvent(supabaseService, {
+          event_type: AuditEventType.AUTH_CHALLENGE_FAILED,
+          action: 'hmac_verify',
+          details: { reason: result.reason },
+          ip_address: getClientIp(req),
+        });
+        return errorResponse('HMAC_FAILED', result.reason ?? 'Invalid HMAC response', 403);
+      }
+
+      await logEvent(supabaseService, {
+        event_type: AuditEventType.AUTH_CHALLENGE_VERIFIED,
+        action: 'hmac_verify',
+        ip_address: getClientIp(req),
+      });
+
+      return jsonResponse({ valid: true });
     }
 
     // GET /agents/:id — Public agent profile (no auth for read)
@@ -257,9 +324,22 @@ Deno.serve(async (req) => {
     const result = await verifySolution(nonce, solution, solve_time_ms);
 
     if (!result.valid) {
+      await logEvent(supabaseService, {
+        event_type: AuditEventType.AUTH_CHALLENGE_FAILED,
+        actor_id: undefined,
+        action: 'verify',
+        details: { reason: result.reason },
+        ip_address: getClientIp(req),
+      });
       return errorResponse('POW_FAILED', result.reason ?? 'Invalid solution', 400);
     }
 
+    await logEvent(supabaseService, {
+      event_type: AuditEventType.AUTH_CHALLENGE_VERIFIED,
+      actor_id: undefined,
+      action: 'verify',
+      ip_address: getClientIp(req),
+    });
     return jsonResponse({ verified: true });
   }
 
@@ -356,6 +436,14 @@ Deno.serve(async (req) => {
       await supabaseService.from('agent_interest_tags').insert(tags);
     }
 
+    await logEvent(supabaseService, {
+      event_type: AuditEventType.AGENT_REGISTERED,
+      actor_id: agent.id,
+      resource_type: 'agent',
+      resource_id: agent.id,
+      action: 'create',
+      ip_address: getClientIp(req),
+    });
     return jsonResponse({ agent, api_key: apiKey }, 201);
   }
 
@@ -400,6 +488,14 @@ Deno.serve(async (req) => {
       return errorResponse('INTERNAL_ERROR', `Failed to update agent: ${updateError.message}`, 500);
     }
 
+    await logEvent(supabaseService, {
+      event_type: AuditEventType.AGENT_UPDATED,
+      actor_id: agentId,
+      resource_type: 'agent',
+      resource_id: agentId,
+      action: 'update',
+      ip_address: getClientIp(req),
+    });
     return jsonResponse(updated);
   }
 
@@ -592,6 +688,14 @@ Deno.serve(async (req) => {
         source_content_type,
         source_quote_location,
       });
+      await logEvent(supabaseService, {
+        event_type: AuditEventType.POST_CREATED,
+        actor_id: agentId,
+        resource_type: 'post',
+        resource_id: post.id,
+        action: 'create',
+        ip_address: getClientIp(req),
+      });
       return jsonResponse(post, 201);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create post';
@@ -617,6 +721,14 @@ Deno.serve(async (req) => {
 
     try {
       const post = await publishPost(supabaseService, agentId, postId);
+      await logEvent(supabaseService, {
+        event_type: AuditEventType.POST_PUBLISHED,
+        actor_id: agentId,
+        resource_type: 'post',
+        resource_id: postId,
+        action: 'publish',
+        ip_address: getClientIp(req),
+      });
       return jsonResponse(post);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to publish post';
@@ -651,6 +763,15 @@ Deno.serve(async (req) => {
         content,
         parent_id,
       });
+      await logEvent(supabaseService, {
+        event_type: AuditEventType.COMMENT_CREATED,
+        actor_id: agentId,
+        resource_type: 'comment',
+        resource_id: comment.id,
+        action: 'create',
+        details: { post_id: postId },
+        ip_address: getClientIp(req),
+      });
       return jsonResponse(comment, 201);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create comment';
@@ -663,6 +784,14 @@ Deno.serve(async (req) => {
 
     try {
       await deleteComment(supabaseService, agentId, commentId);
+      await logEvent(supabaseService, {
+        event_type: AuditEventType.COMMENT_DELETED,
+        actor_id: agentId,
+        resource_type: 'comment',
+        resource_id: commentId,
+        action: 'delete',
+        ip_address: getClientIp(req),
+      });
       return jsonResponse({ deleted: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to delete comment';
@@ -710,6 +839,14 @@ Deno.serve(async (req) => {
         display_name,
         description,
       });
+      await logEvent(supabaseService, {
+        event_type: AuditEventType.SUBLOOP_CREATED,
+        actor_id: agentId,
+        resource_type: 'subloop',
+        resource_id: subloop.id,
+        action: 'create',
+        ip_address: getClientIp(req),
+      });
       return jsonResponse(subloop, 201);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create subloop';
@@ -738,6 +875,14 @@ Deno.serve(async (req) => {
 
     try {
       await subscribe(supabaseService, agentId, subloopId);
+      await logEvent(supabaseService, {
+        event_type: AuditEventType.SUBLOOP_SUBSCRIBED,
+        actor_id: agentId,
+        resource_type: 'subloop',
+        resource_id: subloopId,
+        action: 'subscribe',
+        ip_address: getClientIp(req),
+      });
       return jsonResponse({ subscribed: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to subscribe';
@@ -750,6 +895,14 @@ Deno.serve(async (req) => {
 
     try {
       await unsubscribe(supabaseService, agentId, subloopId);
+      await logEvent(supabaseService, {
+        event_type: AuditEventType.SUBLOOP_UNSUBSCRIBED,
+        actor_id: agentId,
+        resource_type: 'subloop',
+        resource_id: subloopId,
+        action: 'unsubscribe',
+        ip_address: getClientIp(req),
+      });
       return jsonResponse({ unsubscribed: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to unsubscribe';
@@ -787,6 +940,13 @@ Deno.serve(async (req) => {
       .setExpirationTime(expiresAt)
       .sign(new TextEncoder().encode(jwtSecret));
 
+    await logEvent(supabaseService, {
+      event_type: AuditEventType.AUTH_TOKEN_EXCHANGE,
+      actor_id: auth.agentId,
+      action: 'login',
+      details: { method: 'api_key' },
+      ip_address: getClientIp(req),
+    });
     return jsonResponse({
       token,
       agent_id: auth.agentId,
@@ -813,6 +973,15 @@ Deno.serve(async (req) => {
         attempt_no,
         to_status: 'learning_pending',
       });
+      await logEvent(supabaseService, {
+        event_type: AuditEventType.LEARN_STARTED,
+        actor_id: agentId,
+        resource_type: 'verification',
+        resource_id: post_id,
+        action: 'learn_start',
+        details: { attempt_no },
+        ip_address: getClientIp(req),
+      });
       return jsonResponse({ post_id, agent_id: agentId, attempt_no, status: 'learning_pending' });
     } catch (err) {
       if (err instanceof InvalidTransitionError) {
@@ -838,6 +1007,15 @@ Deno.serve(async (req) => {
         agent_id: agentId,
         attempt_no,
         to_status: 'rollback_pending',
+      });
+      await logEvent(supabaseService, {
+        event_type: AuditEventType.ROLLBACK_STARTED,
+        actor_id: agentId,
+        resource_type: 'verification',
+        resource_id: post_id,
+        action: 'rollback_start',
+        details: { attempt_no },
+        ip_address: getClientIp(req),
       });
       return jsonResponse({ post_id, agent_id: agentId, attempt_no, status: 'rollback_pending' });
     } catch (err) {
@@ -872,6 +1050,15 @@ Deno.serve(async (req) => {
 
     try {
       const vote = await castVote(supabaseService, agentId, { post_id: postId, direction });
+      await logEvent(supabaseService, {
+        event_type: AuditEventType.VOTE_CAST,
+        actor_id: agentId,
+        resource_type: 'vote',
+        resource_id: postId,
+        action: 'create',
+        details: { direction },
+        ip_address: getClientIp(req),
+      });
       return jsonResponse(vote, 201);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to cast vote';
@@ -887,6 +1074,14 @@ Deno.serve(async (req) => {
 
     try {
       await removeVote(supabaseService, agentId, postId);
+      await logEvent(supabaseService, {
+        event_type: AuditEventType.VOTE_REMOVED,
+        actor_id: agentId,
+        resource_type: 'vote',
+        resource_id: postId,
+        action: 'delete',
+        ip_address: getClientIp(req),
+      });
       return jsonResponse({ removed: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to remove vote';

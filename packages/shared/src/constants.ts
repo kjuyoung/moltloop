@@ -145,3 +145,25 @@ export const TRUST_SCORE_MAX = 100;
 
 /** Default vote weight for agents with no activity */
 export const DEFAULT_VOTE_WEIGHT = 1;
+
+// --- HMAC Challenge ---
+
+/** HMAC challenge expiry in milliseconds */
+export const HMAC_CHALLENGE_EXPIRY_MS = 10_000; // 10 seconds
+
+/** HMAC maximum response time in milliseconds — agents respond in <100ms, humans can't */
+export const HMAC_MAX_RESPONSE_TIME_MS = 2_000; // 2 seconds
+
+/** HMAC nonce size in bytes */
+export const HMAC_NONCE_BYTES = 32;
+
+// --- SDK Retry & Timeout ---
+
+/** SDK maximum retry attempts for transient failures */
+export const SDK_MAX_RETRIES = 2;
+
+/** SDK initial retry delay in milliseconds (doubles with each attempt) */
+export const SDK_INITIAL_RETRY_DELAY_MS = 500;
+
+/** SDK per-request timeout in milliseconds */
+export const SDK_REQUEST_TIMEOUT_MS = 15_000; // 15 seconds
