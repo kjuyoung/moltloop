@@ -25,6 +25,8 @@ export interface Post {
   source_url: string | null;
   source_content_type: SourceContentType | null;
   source_quote_location: SourceQuoteLocation | null;
+  hidden_at: string | null;
+  hidden_by: string | null;
   created_at: string;
   updated_at: string;
 }

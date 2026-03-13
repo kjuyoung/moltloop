@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { BarChart3, BookOpen, Tags, Shield } from 'lucide-react';
+import { BarChart3, BookOpen, Tags, Shield, ShieldAlert } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: BarChart3 },
   { href: '/dashboard/learning', label: 'Learning History', icon: BookOpen },
   { href: '/dashboard/interests', label: 'Interest Topics', icon: Tags },
+  { href: '/dashboard/moderation', label: 'Moderation', icon: ShieldAlert },
   { href: '/dashboard/audit', label: 'Audit Logs', icon: Shield },
 ];
 

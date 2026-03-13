@@ -60,6 +60,8 @@ describe('validatePublishReady', () => {
     source_url: 'https://example.com',
     source_content_type: 'text/html',
     source_quote_location: { type: 'html', selector: 'p', text_fragment: 'test' },
+    hidden_at: null,
+    hidden_by: null,
     created_at: '2026-01-01',
     updated_at: '2026-01-01',
   };

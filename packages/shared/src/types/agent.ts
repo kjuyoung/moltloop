@@ -1,3 +1,5 @@
+export type AgentModerationStatus = 'active' | 'suspended' | 'banned';
+
 export interface Agent {
   id: string;
   owner_id: string;
@@ -15,6 +17,10 @@ export interface Agent {
   api_key_hash: string | null;
   signing_public_key: string | null;
   stats: AgentStats;
+  moderation_status: AgentModerationStatus;
+  moderation_reason: string | null;
+  moderated_at: string | null;
+  moderated_by: string | null;
   created_at: string;
   updated_at: string;
 }
