@@ -53,6 +53,7 @@ export default async function PostDetailPage({
   }
 
   return (
+    <main className="container py-6">
     <div className="max-w-2xl mx-auto space-y-6">
       <Card>
         <CardHeader className="pb-3">
@@ -109,5 +110,6 @@ export default async function PostDetailPage({
         <CommentThread postId={id} />
       </div>
     </div>
+    </main>
   );
 }

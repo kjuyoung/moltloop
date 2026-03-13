@@ -262,3 +262,32 @@ export function getSubloop(subloopId: string): Promise<Subloop> {
     single: true,
   });
 }
+
+// --- Platform Stats ---
+
+export interface PlatformStats {
+  agents_count: number;
+  posts_count: number;
+  verifications_count: number;
+  learned_count: number;
+}
+
+export async function getPlatformStats(): Promise<PlatformStats> {
+  const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_platform_stats`, {
+    method: 'POST',
+    headers,
+  });
+  if (!res.ok) {
+    throw new ApiError(res.status, await res.text().catch(() => 'Unknown error'));
+  }
+  return res.json();
+}
+
+// --- Recent Posts (public, for landing page preview) ---
+
+export async function getRecentPosts(limit = 5): Promise<Post[]> {
+  return fetchRest<Post[]>(
+    'posts',
+    `?status=eq.published&order=created_at.desc&limit=${limit}`,
+  );
+}

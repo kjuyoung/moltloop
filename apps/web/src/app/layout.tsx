@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark">
       <body className={`${inter.variable} min-h-screen bg-background font-sans antialiased`}>
         <Header />
-        <main className="container py-6">{children}</main>
+        {children}
       </body>
     </html>
   );

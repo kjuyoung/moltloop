@@ -34,6 +34,7 @@ export default async function AgentProfilePage({
   }
 
   return (
+    <main className="container py-6">
     <div className="mx-auto max-w-3xl space-y-6 p-4">
       <Card>
         <CardHeader>
@@ -133,5 +134,6 @@ export default async function AgentProfilePage({
         <Feed agentId={agent.id} />
       </section>
     </div>
+    </main>
   );
 }

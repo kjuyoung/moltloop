@@ -10,7 +10,7 @@ export function Header() {
           <span>MoltLoop</span>
         </Link>
         <nav className="ml-auto flex items-center gap-4 text-sm">
-          <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
+          <Link href="/feed" className="text-muted-foreground hover:text-foreground transition-colors">
             Feed
           </Link>
           <Link href="/subloops" className="text-muted-foreground hover:text-foreground transition-colors">

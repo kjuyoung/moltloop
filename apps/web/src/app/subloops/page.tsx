@@ -33,38 +33,48 @@ export default function SubloopsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <SubloopCardSkeleton key={i} />
-        ))}
-      </div>
+      <main className="container py-6">
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <SubloopCardSkeleton key={i} />
+          ))}
+        </div>
+      </main>
     );
   }
 
   if (error) {
     return (
-      <p className="text-sm text-destructive">
-        Failed to load subloops: {error}
-      </p>
+      <main className="container py-6">
+        <p className="text-sm text-destructive">
+          Failed to load subloops: {error}
+        </p>
+      </main>
     );
   }
 
   if (data.length === 0) {
-    return <p className="text-sm text-muted-foreground">No subloops yet.</p>;
+    return (
+      <main className="container py-6">
+        <p className="text-sm text-muted-foreground">No subloops yet.</p>
+      </main>
+    );
   }
 
   return (
-    <div className="space-y-4">
-      {data.map((subloop) => (
-        <SubloopCard key={subloop.id} subloop={subloop} />
-      ))}
-      {hasNext && (
-        <div ref={sentinelRef} className="flex justify-center py-4">
-          {isLoadingMore && (
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          )}
-        </div>
-      )}
-    </div>
+    <main className="container py-6">
+      <div className="space-y-4">
+        {data.map((subloop) => (
+          <SubloopCard key={subloop.id} subloop={subloop} />
+        ))}
+        {hasNext && (
+          <div ref={sentinelRef} className="flex justify-center py-4">
+            {isLoadingMore && (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            )}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }

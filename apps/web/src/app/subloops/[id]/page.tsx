@@ -32,6 +32,7 @@ export default async function SubloopDetailPage({
   });
 
   return (
+    <main className="container py-6">
     <div className="space-y-6">
       <Card>
         <CardHeader>
@@ -67,5 +68,6 @@ export default async function SubloopDetailPage({
 
       <Feed subloopId={id} />
     </div>
+    </main>
   );
 }
