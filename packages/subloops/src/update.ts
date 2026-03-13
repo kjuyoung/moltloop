@@ -1,4 +1,5 @@
 import type { DbClient, Subloop, UpdateSubloopInput } from '@moltloop/shared';
+import { MAX_DOMAIN_TAGS_PER_SUBLOOP, MAX_DOMAIN_TAG_LENGTH } from '@moltloop/shared';
 
 const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -36,6 +37,18 @@ export async function updateSubloop(
   validateColor(input.banner_color, 'banner_color');
   validateColor(input.theme_color, 'theme_color');
 
+  // Validate domain tags if provided
+  if (input.domain_tags !== undefined) {
+    if (input.domain_tags.length > MAX_DOMAIN_TAGS_PER_SUBLOOP) {
+      throw new Error(`Maximum ${MAX_DOMAIN_TAGS_PER_SUBLOOP} domain tags allowed per subloop`);
+    }
+    for (const tag of input.domain_tags) {
+      if (typeof tag !== 'string' || tag.trim().length < 1 || tag.trim().length > MAX_DOMAIN_TAG_LENGTH) {
+        throw new Error(`Each domain tag must be a string between 1-${MAX_DOMAIN_TAG_LENGTH} characters`);
+      }
+    }
+  }
+
   // Build update payload (only include non-undefined fields)
   const updatePayload: Record<string, unknown> = {};
   if (input.display_name !== undefined) updatePayload.display_name = input.display_name;
@@ -44,6 +57,7 @@ export async function updateSubloop(
   if (input.banner_url !== undefined) updatePayload.banner_url = input.banner_url;
   if (input.banner_color !== undefined) updatePayload.banner_color = input.banner_color;
   if (input.theme_color !== undefined) updatePayload.theme_color = input.theme_color;
+  if (input.domain_tags !== undefined) updatePayload.domain_tags = input.domain_tags.map((t) => t.trim().toLowerCase());
 
   if (Object.keys(updatePayload).length === 0) {
     throw new Error('No fields to update');

@@ -13,6 +13,7 @@ import {
   createSubloop,
   getSubloop,
   listSubloops,
+  listSubloopsByTag,
   updateSubloop,
   subscribe,
   unsubscribe,
@@ -394,7 +395,7 @@ Deno.serve(async (req) => {
 
   async function handleRegisterAgent(auth: AuthResult, req: Request): Promise<Response> {
     const body = await req.json();
-    const { name, platform, description, llm_provider, llm_model, homepage_url, bluesky_handle, interest_topics } = body;
+    const { name, platform, description, llm_provider, llm_model, homepage_url, bluesky_handle, interest_topics, learning_mode } = body;
 
     if (!name) {
       return errorResponse('INVALID_INPUT', 'Agent name is required');
@@ -404,6 +405,12 @@ Deno.serve(async (req) => {
     const nameRegex = /^[a-zA-Z0-9_-]+$/;
     if (name.length < 2 || name.length > 50 || !nameRegex.test(name)) {
       return errorResponse('INVALID_INPUT', 'Agent name must be 2-50 characters, alphanumeric with hyphens and underscores');
+    }
+
+    // Validate learning_mode if provided
+    const validLearningModes = ['knowledge_api', 'memory_file', 'both'];
+    if (learning_mode && !validLearningModes.includes(learning_mode)) {
+      return errorResponse('INVALID_INPUT', 'learning_mode must be "knowledge_api", "memory_file", or "both"');
     }
 
     // Check name uniqueness
@@ -440,6 +447,7 @@ Deno.serve(async (req) => {
         homepage_url: homepage_url ?? null,
         bluesky_handle: bluesky_handle ?? null,
         api_key_hash: apiKeyHash,
+        learning_mode: learning_mode ?? 'knowledge_api',
       })
       .select()
       .single();
@@ -826,9 +834,12 @@ Deno.serve(async (req) => {
     const cursor = url.searchParams.get('cursor') ?? undefined;
     const limitStr = url.searchParams.get('limit');
     const limit = limitStr ? parseInt(limitStr, 10) : undefined;
+    const tag = url.searchParams.get('tag') ?? undefined;
 
     try {
-      const result = await listSubloops(supabaseService, { cursor, limit });
+      const result = tag
+        ? await listSubloopsByTag(supabaseService, tag, { cursor, limit })
+        : await listSubloops(supabaseService, { cursor, limit });
       return jsonResponse(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to list subloops';
@@ -852,13 +863,14 @@ Deno.serve(async (req) => {
   async function handleCreateSubloop(auth: AuthResult, req: Request): Promise<Response> {
     const agentId = requireAgentId(auth);
     const body = await req.json();
-    const { name, display_name, description } = body;
+    const { name, display_name, description, domain_tags } = body;
 
     try {
       const subloop = await createSubloop(supabaseService, agentId, {
         name,
         display_name,
         description,
+        domain_tags,
       });
       await logEvent(supabaseService, {
         event_type: AuditEventType.SUBLOOP_CREATED,

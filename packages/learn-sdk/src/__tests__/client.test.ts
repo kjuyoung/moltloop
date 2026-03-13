@@ -159,8 +159,8 @@ describe('MoltLoopClient.learn', () => {
     );
   });
 
-  it('should complete full learn flow', async () => {
-    const { client, fetchMock } = await createInitializedClient({
+  it('should complete full learn flow (memory_file mode)', async () => {
+    const fetchMock = setupFetchWithAuth({
       '/verify': {
         status: 200,
         body: {
@@ -186,6 +186,12 @@ describe('MoltLoopClient.learn', () => {
         },
       },
     });
+    const client = new MoltLoopClient({
+      serverUrl: TEST_SERVER_URL,
+      apiKey: TEST_API_KEY,
+      learningMode: 'memory_file',
+    });
+    await client.init();
 
     const result = await client.learn('post-1');
 
@@ -215,6 +221,55 @@ describe('MoltLoopClient.learn', () => {
     expect(urls).toContainEqual(expect.stringContaining('/verify'));
     expect(urls).toContainEqual(expect.stringContaining('/api/learn/start'));
     expect(urls).toContainEqual(expect.stringContaining('/ack/learn'));
+  });
+
+  it('should complete full learn flow (knowledge_api mode)', async () => {
+    setupFetchWithAuth({
+      '/verify': {
+        status: 200,
+        body: {
+          post_id: 'post-1',
+          agent_id: 'agent-1',
+          attempt_no: 1,
+          status: 'verified',
+          extracted_text: 'raw content',
+          source_url: 'https://example.com/source',
+        },
+      },
+      '/api/learn/start': {
+        status: 200,
+        body: { post_id: 'post-1', attempt_no: 1, status: 'learning_pending' },
+      },
+      '/ack/learn': {
+        status: 200,
+        body: {
+          post_id: 'post-1',
+          attempt_no: 1,
+          status: 'learned',
+          learned_at: '2026-01-01T00:00:00Z',
+        },
+      },
+      '/knowledge/embed': {
+        status: 200,
+        body: { embedding: Array(384).fill(0) },
+      },
+      '/knowledge/store': {
+        status: 200,
+        body: { id: 'knowledge-1' },
+      },
+    });
+    const client = new MoltLoopClient({
+      serverUrl: TEST_SERVER_URL,
+      apiKey: TEST_API_KEY,
+      learningMode: 'knowledge_api',
+    });
+    await client.init();
+
+    const result = await client.learn('post-1');
+
+    expect(result.success).toBe(true);
+    // In knowledge_api mode, appendLearningBlock should NOT be called
+    expect(appendLearningBlock).not.toHaveBeenCalled();
   });
 
   it('should return failure on verification rejection', async () => {
@@ -303,12 +358,12 @@ describe('MoltLoopClient.learn', () => {
     expect(ackBody.reason).toContain('sanitization_rejected');
   });
 
-  it('should return failure on memory write failure', async () => {
+  it('should return failure on memory write failure (memory_file mode)', async () => {
     (appendLearningBlock as Mock).mockRejectedValueOnce(
       new Error('disk full'),
     );
 
-    const { client } = await createInitializedClient({
+    setupFetchWithAuth({
       '/verify': {
         status: 200,
         body: {
@@ -329,6 +384,12 @@ describe('MoltLoopClient.learn', () => {
         body: { post_id: 'post-1', attempt_no: 1, status: 'failed' },
       },
     });
+    const client = new MoltLoopClient({
+      serverUrl: TEST_SERVER_URL,
+      apiKey: TEST_API_KEY,
+      learningMode: 'memory_file',
+    });
+    await client.init();
 
     const result = await client.learn('post-1');
 
@@ -338,8 +399,8 @@ describe('MoltLoopClient.learn', () => {
     }
   });
 
-  it('should return failure on ack error', async () => {
-    const { client } = await createInitializedClient({
+  it('should return failure on ack error (memory_file mode)', async () => {
+    setupFetchWithAuth({
       '/verify': {
         status: 200,
         body: {
@@ -357,6 +418,12 @@ describe('MoltLoopClient.learn', () => {
       },
       '/ack/learn': { status: 500, body: { error: 'server error' } },
     });
+    const client = new MoltLoopClient({
+      serverUrl: TEST_SERVER_URL,
+      apiKey: TEST_API_KEY,
+      learningMode: 'memory_file',
+    });
+    await client.init();
 
     const result = await client.learn('post-1');
 

@@ -1,0 +1,19 @@
+{
+  "name": "@moltloop/sdk-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "generate": "openapi-typescript ../openapi/openapi.yaml -o ./src/generated/api.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.10.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.0.0",
+    "typescript": "^5.3.3"
+  }
+}

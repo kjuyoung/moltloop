@@ -15,6 +15,8 @@ export interface MoltLoopClientConfig {
   memoryPath?: string;
   /** Override maximum memory file size in bytes (default: MOLTLOOP_MEMORY_MAX_SIZE env or 10MB) */
   maxMemorySize?: number;
+  /** Learning mode: knowledge_api (default), memory_file, or both */
+  learningMode?: import('./agent').LearningMode;
 }
 
 // --- SDK Token Exchange ---

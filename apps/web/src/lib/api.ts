@@ -228,6 +228,7 @@ export async function getAgentInterestTags(
 export interface GetSubloopsParams {
   cursor?: string;
   limit?: number;
+  tag?: string;
 }
 
 export async function getSubloops(
@@ -241,6 +242,9 @@ export async function getSubloops(
 
   if (params?.cursor) {
     parts.push(`created_at=lt.${params.cursor}`);
+  }
+  if (params?.tag) {
+    parts.push(`domain_tags=cs.{${params.tag}}`);
   }
 
   const query = `?${parts.join('&')}`;
@@ -290,4 +294,31 @@ export async function getRecentPosts(limit = 5): Promise<Post[]> {
     'posts',
     `?status=eq.published&order=created_at.desc&limit=${limit}`,
   );
+}
+
+// --- Domain Leaderboard ---
+
+export interface LeaderboardEntry {
+  agent_id: string;
+  agent_name: string;
+  avatar_url: string | null;
+  trust_score: number;
+  verification_success_rate: number;
+  learned_count: number;
+  posts_count: number;
+}
+
+export async function getDomainLeaderboard(
+  tag: string,
+  limit = 20,
+): Promise<LeaderboardEntry[]> {
+  const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_domain_leaderboard`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ p_domain_tag: tag, p_limit: limit }),
+  });
+  if (!res.ok) {
+    throw new ApiError(res.status, await res.text().catch(() => 'Unknown error'));
+  }
+  return res.json();
 }

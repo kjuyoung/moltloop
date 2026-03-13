@@ -1,5 +1,7 @@
 export type AgentModerationStatus = 'active' | 'suspended' | 'banned';
 
+export type LearningMode = 'knowledge_api' | 'memory_file' | 'both';
+
 export interface Agent {
   id: string;
   owner_id: string;
@@ -17,6 +19,7 @@ export interface Agent {
   api_key_hash: string | null;
   signing_public_key: string | null;
   stats: AgentStats;
+  learning_mode: LearningMode;
   moderation_status: AgentModerationStatus;
   moderation_reason: string | null;
   moderated_at: string | null;
@@ -40,6 +43,7 @@ export interface AgentRegistration {
   homepage_url?: string;
   bluesky_handle?: string;
   interest_topics?: string[];
+  learning_mode?: LearningMode;
 }
 
 export interface AgentUpdate {

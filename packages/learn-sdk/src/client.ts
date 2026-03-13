@@ -6,6 +6,7 @@ import type {
   SyncMemoryStateRequest,
   AckRequest,
   LearnedBlock,
+  LearningMode,
 } from '@moltloop/shared';
 import {
   resolveMemoryPath,
@@ -82,6 +83,7 @@ export class MoltLoopClient {
   private memoryPath: string;
   private agentId: string;
   private readonly maxMemorySize?: number;
+  private readonly learningMode: LearningMode;
   private initialized = false;
 
   constructor(config: MoltLoopClientConfig) {
@@ -89,6 +91,7 @@ export class MoltLoopClient {
     this.agentId = config.agentId ?? '';
     this.memoryPath = config.memoryPath ?? '';
     this.maxMemorySize = config.maxMemorySize;
+    this.learningMode = config.learningMode ?? 'knowledge_api';
   }
 
   // ---------------------------------------------------------------------------
@@ -236,32 +239,85 @@ export class MoltLoopClient {
       });
     }
 
-    // Step 3: Write the learned block to memory.md
-    const block: LearnedBlock = {
-      post_id: postId,
-      attempt_no,
-      timestamp: new Date().toISOString(),
-      content: sanitizeResult.content,
-      source_url: source_url ?? '',
-    };
+    const useKnowledgeApi = this.learningMode === 'knowledge_api' || this.learningMode === 'both';
+    const useMemoryFile = this.learningMode === 'memory_file' || this.learningMode === 'both';
 
-    let writeSuccess: boolean;
-    try {
-      writeSuccess = await appendLearningBlock(
-        this.memoryPath,
-        block,
-        this.maxMemorySize,
-      );
-    } catch {
-      writeSuccess = false;
+    // Step 3: Knowledge API path (fire-and-forget, no ack needed)
+    if (useKnowledgeApi) {
+      this.storeKnowledgeEmbedding(postId, attempt_no, sanitizeResult.content, source_url ?? '').catch(() => {
+        // Best-effort: embedding storage failure should not fail the learn
+      });
     }
 
-    // Step 4: Acknowledge result to server
+    // Step 4: Memory file path (ack-based)
+    if (useMemoryFile) {
+      const block: LearnedBlock = {
+        post_id: postId,
+        attempt_no,
+        timestamp: new Date().toISOString(),
+        content: sanitizeResult.content,
+        source_url: source_url ?? '',
+      };
+
+      let writeSuccess: boolean;
+      try {
+        writeSuccess = await appendLearningBlock(
+          this.memoryPath,
+          block,
+          this.maxMemorySize,
+        );
+      } catch {
+        writeSuccess = false;
+      }
+
+      const ackPayload: AckRequest = {
+        post_id: postId,
+        attempt_no,
+        result: writeSuccess ? 'success' : 'failure',
+        ...(writeSuccess ? {} : { reason: 'memory_write_failed' }),
+      };
+
+      try {
+        const ackRes = await this.http.request<AckLearnResponse>(
+          '/ack/learn',
+          ackPayload,
+        );
+
+        if (writeSuccess) {
+          if (options?.trackQuality) {
+            this.recordQualitySnapshot(postId, attempt_no, 'post_learn').catch(() => {});
+          }
+
+          return {
+            success: true,
+            post_id: postId,
+            attempt_no,
+            learned_at: ackRes.learned_at ?? new Date().toISOString(),
+          };
+        }
+
+        return {
+          success: false,
+          post_id: postId,
+          reason: 'memory_write_failed',
+          detail: `Failed to append learning block for post ${postId} (attempt ${attempt_no}) to ${this.memoryPath}`,
+        };
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        return {
+          success: false,
+          post_id: postId,
+          reason: 'ack_error',
+          detail: `Learn acknowledgement failed for post ${postId} (attempt ${attempt_no}). Server reconciliation will retry. Original error: ${detail}`,
+        };
+      }
+    }
+
+    // Knowledge API-only path: ack directly without memory.md write
     const ackPayload: AckRequest = {
       post_id: postId,
       attempt_no,
-      result: writeSuccess ? 'success' : 'failure',
-      ...(writeSuccess ? {} : { reason: 'memory_write_failed' }),
+      result: 'success',
     };
 
     try {
@@ -270,37 +326,17 @@ export class MoltLoopClient {
         ackPayload,
       );
 
-      if (writeSuccess) {
-        // Phase 2: Store knowledge embedding (best-effort, non-blocking)
-        if (options?.storeEmbedding) {
-          this.storeKnowledgeEmbedding(postId, attempt_no, sanitizeResult.content, source_url ?? '').catch(() => {
-            // Best-effort: embedding storage failure should not fail the learn
-          });
-        }
-
-        // Phase 2: Record post-learn quality snapshot (best-effort)
-        if (options?.trackQuality) {
-          this.recordQualitySnapshot(postId, attempt_no, 'post_learn').catch(() => {
-            // Best-effort: quality tracking failure should not fail the learn
-          });
-        }
-
-        return {
-          success: true,
-          post_id: postId,
-          attempt_no,
-          learned_at: ackRes.learned_at ?? new Date().toISOString(),
-        };
+      if (options?.trackQuality) {
+        this.recordQualitySnapshot(postId, attempt_no, 'post_learn').catch(() => {});
       }
 
       return {
-        success: false,
+        success: true,
         post_id: postId,
-        reason: 'memory_write_failed',
-        detail: `Failed to append learning block for post ${postId} (attempt ${attempt_no}) to ${this.memoryPath}`,
+        attempt_no,
+        learned_at: ackRes.learned_at ?? new Date().toISOString(),
       };
     } catch (err) {
-      // Ack itself failed — the server may reconcile this later
       const detail = err instanceof Error ? err.message : String(err);
       return {
         success: false,

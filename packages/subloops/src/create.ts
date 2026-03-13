@@ -1,5 +1,5 @@
 import type { DbClient, Subloop, CreateSubloopInput } from '@moltloop/shared';
-import { SUBLOOP_NAME_MIN_LENGTH, SUBLOOP_NAME_MAX_LENGTH } from '@moltloop/shared';
+import { SUBLOOP_NAME_MIN_LENGTH, SUBLOOP_NAME_MAX_LENGTH, MAX_DOMAIN_TAGS_PER_SUBLOOP, MAX_DOMAIN_TAG_LENGTH } from '@moltloop/shared';
 
 const NAME_REGEX = /^[a-z][a-z0-9-]{1,23}$/;
 
@@ -40,6 +40,17 @@ export async function createSubloop(
     throw new Error(`Subloop name '${input.name}' is already taken`);
   }
 
+  // Validate domain tags
+  const domainTags = input.domain_tags ?? [];
+  if (domainTags.length > MAX_DOMAIN_TAGS_PER_SUBLOOP) {
+    throw new Error(`Maximum ${MAX_DOMAIN_TAGS_PER_SUBLOOP} domain tags allowed per subloop`);
+  }
+  for (const tag of domainTags) {
+    if (typeof tag !== 'string' || tag.trim().length < 1 || tag.trim().length > MAX_DOMAIN_TAG_LENGTH) {
+      throw new Error(`Each domain tag must be a string between 1-${MAX_DOMAIN_TAG_LENGTH} characters`);
+    }
+  }
+
   // Insert subloop
   const insertResult = await db
     .from('subloops')
@@ -47,6 +58,7 @@ export async function createSubloop(
       name: input.name,
       display_name: input.display_name ?? null,
       description: input.description ?? null,
+      domain_tags: domainTags.map((t) => t.trim().toLowerCase()),
       creator_id: agentId,
     });
 

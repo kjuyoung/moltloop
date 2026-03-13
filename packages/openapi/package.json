@@ -1,0 +1,7 @@
+{
+  "name": "@moltloop/openapi",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./openapi.yaml",
+  "files": ["openapi.yaml"]
+}

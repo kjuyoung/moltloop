@@ -54,6 +54,7 @@ export async function registerAgent(
       homepage_url: input.homepage_url ?? null,
       bluesky_handle: input.bluesky_handle ?? null,
       api_key_hash: apiKeyInfo.hash,
+      learning_mode: input.learning_mode ?? 'knowledge_api',
     });
 
   if (insertResult.error) {

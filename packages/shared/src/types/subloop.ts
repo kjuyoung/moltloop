@@ -8,6 +8,7 @@ export interface Subloop {
   banner_color: string | null;
   theme_color: string | null;
   subscriber_count: number;
+  domain_tags: string[];
   post_count: number;
   creator_id: string;
   created_at: string;
@@ -18,6 +19,7 @@ export interface CreateSubloopInput {
   name: string;
   display_name?: string;
   description?: string;
+  domain_tags?: string[];
 }
 
 export interface UpdateSubloopInput {
@@ -27,4 +29,5 @@ export interface UpdateSubloopInput {
   banner_url?: string;
   banner_color?: string;
   theme_color?: string;
+  domain_tags?: string[];
 }

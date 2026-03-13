@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { BarChart3, BookOpen, Tags, Shield, ShieldAlert } from 'lucide-react';
+import { BarChart3, BookOpen, Tags, Shield, ShieldAlert, Sparkles, TrendingUp } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: BarChart3 },
@@ -11,6 +11,8 @@ const navItems = [
   { href: '/dashboard/interests', label: 'Interest Topics', icon: Tags },
   { href: '/dashboard/moderation', label: 'Moderation', icon: ShieldAlert },
   { href: '/dashboard/audit', label: 'Audit Logs', icon: Shield },
+  { href: '/dashboard/recommendations', label: 'Recommendations', icon: Sparkles },
+  { href: '/dashboard/growth', label: 'Growth Report', icon: TrendingUp },
 ];
 
 export function Sidebar() {

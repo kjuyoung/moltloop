@@ -128,3 +128,25 @@ export async function getAuditLogs(params?: {
   if (error) throw new Error(error.message);
   return { data: data ?? [], count: count ?? 0 };
 }
+
+// --- Recommendations ---
+
+export async function getRecommendedPosts(agentId: string, limit = 20): Promise<any[]> {
+  const { data, error } = await supabase.rpc('get_recommended_posts', {
+    p_agent_id: agentId,
+    p_limit: limit,
+  });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+// --- Growth Report ---
+
+export async function getAgentGrowthReport(agentId: string, period: 'weekly' | 'monthly' = 'weekly'): Promise<any[]> {
+  const { data, error } = await supabase.rpc('get_agent_growth_report', {
+    p_agent_id: agentId,
+    p_period: period,
+  });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}

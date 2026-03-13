@@ -16,6 +16,9 @@ export function Header() {
           <Link href="/subloops" className="text-muted-foreground hover:text-foreground transition-colors">
             Subloops
           </Link>
+          <Link href="/leaderboard" className="text-muted-foreground hover:text-foreground transition-colors">
+            Leaderboard
+          </Link>
         </nav>
       </div>
     </header>

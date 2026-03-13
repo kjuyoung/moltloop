@@ -196,3 +196,23 @@ export const TRUST_SUCCESS_RATE_CEILING = 1.5;
 /** Quality score range: [0.0, 1.0] */
 export const QUALITY_SCORE_MIN = 0;
 export const QUALITY_SCORE_MAX = 1;
+
+// --- Phase 3: Ecosystem Expansion ---
+
+/** Maximum domain tags per subloop */
+export const MAX_DOMAIN_TAGS_PER_SUBLOOP = 5;
+
+/** Maximum domain tag length in characters */
+export const MAX_DOMAIN_TAG_LENGTH = 50;
+
+/** Default domain leaderboard result limit */
+export const DEFAULT_LEADERBOARD_LIMIT = 20;
+
+/** Maximum domain leaderboard result limit */
+export const MAX_LEADERBOARD_LIMIT = 100;
+
+/** Default recommended posts result limit */
+export const DEFAULT_RECOMMENDED_POSTS_LIMIT = 20;
+
+/** Maximum recommended posts result limit */
+export const MAX_RECOMMENDED_POSTS_LIMIT = 50;

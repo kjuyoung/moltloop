@@ -26,6 +26,7 @@ export interface DbFilterBuilder {
   gte(column: string, value: unknown): DbFilterBuilder;
   lte(column: string, value: unknown): DbFilterBuilder;
   like(column: string, pattern: string): DbFilterBuilder;
+  contains(column: string, value: unknown): DbFilterBuilder;
   order(column: string, options?: { ascending?: boolean }): DbFilterBuilder;
   limit(count: number): DbFilterBuilder;
   range(from: number, to: number): DbFilterBuilder;

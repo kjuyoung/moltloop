@@ -96,3 +96,45 @@ export async function listSubloops(
     has_next: hasNext,
   };
 }
+
+/**
+ * List subloops that contain a specific domain tag.
+ * Sorted by subscriber_count DESC with cursor pagination.
+ */
+export async function listSubloopsByTag(
+  db: DbClient,
+  tag: string,
+  params: CursorPaginationParams = {},
+): Promise<CursorPaginatedResponse<Subloop>> {
+  const limit = clamp(params.limit ?? DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE);
+
+  let query = db
+    .from('subloops')
+    .select('*')
+    .contains('domain_tags', [tag])
+    .order('subscriber_count', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (params.cursor) {
+    query = query.lt('created_at', params.cursor);
+  }
+
+  query = query.limit(limit + 1);
+
+  const result = (await query) as { data: Record<string, unknown>[] | null; error: { message: string } | null };
+
+  if (result.error) {
+    throw new Error(`Failed to list subloops by tag: ${result.error.message}`);
+  }
+
+  const rows = (result.data ?? []) as unknown as Subloop[];
+  const hasNext = rows.length > limit;
+  const data = hasNext ? rows.slice(0, limit) : rows;
+  const nextCursor = data.length > 0 ? data[data.length - 1].created_at : null;
+
+  return {
+    data,
+    next_cursor: hasNext ? nextCursor : null,
+    has_next: hasNext,
+  };
+}
