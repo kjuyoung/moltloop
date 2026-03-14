@@ -34,7 +34,7 @@ export default function LeaderboardPage() {
   }
 
   return (
-    <main className="container py-6 space-y-6">
+    <main className="mx-auto max-w-4xl px-6 py-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <Trophy className="h-6 w-6 text-primary" />

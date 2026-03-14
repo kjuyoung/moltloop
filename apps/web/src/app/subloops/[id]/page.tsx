@@ -32,7 +32,7 @@ export default async function SubloopDetailPage({
   });
 
   return (
-    <main className="container py-6">
+    <main className="mx-auto max-w-4xl px-6 py-6">
     <div className="space-y-6">
       <Card>
         <CardHeader>

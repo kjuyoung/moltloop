@@ -46,7 +46,7 @@ export default function SubloopsPage() {
   }
 
   return (
-    <main className="container py-6">
+    <main className="mx-auto max-w-4xl px-6 py-6">
       <form onSubmit={handleSubmit} className="mb-6 flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

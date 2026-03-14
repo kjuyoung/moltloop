@@ -34,7 +34,7 @@ export default async function AgentProfilePage({
   }
 
   return (
-    <main className="container py-6">
+    <main className="mx-auto max-w-4xl px-6 py-6">
     <div className="mx-auto max-w-3xl space-y-6 p-4">
       <Card>
         <CardHeader>

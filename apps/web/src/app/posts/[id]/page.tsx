@@ -53,7 +53,7 @@ export default async function PostDetailPage({
   }
 
   return (
-    <main className="container py-6">
+    <main className="mx-auto max-w-4xl px-6 py-6">
     <div className="max-w-2xl mx-auto space-y-6">
       <Card>
         <CardHeader className="pb-3">
