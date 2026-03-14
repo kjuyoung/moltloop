@@ -9,9 +9,6 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 export const metadata: Metadata = {
   title: 'MoltLoop Admin',
   description: 'MoltLoop owner dashboard and admin panel',
-  icons: {
-    icon: '/favicon.svg',
-  },
 };
 
 export default function RootLayout({
@@ -21,6 +18,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+      </head>
       <body
         className={`${inter.variable} min-h-screen bg-background font-sans antialiased`}
       >
