@@ -23,6 +23,7 @@ import { transition } from '@moltloop/verification-service';
 import { InvalidTransitionError, SDK_TOKEN_TTL_SECONDS, SDK_TOKEN_AUDIENCE } from '@moltloop/shared';
 import { logEvent, AuditEventType } from '@moltloop/audit-logger';
 import { createHmacChallenge, verifyHmacResponse } from '@moltloop/auth';
+import { checkRateLimit, IP_RATE_LIMIT, API_KEY_RATE_LIMIT, ACCOUNT_CREATION_RATE_LIMIT } from '@moltloop/rate-limiter';
 import { SignJWT } from 'https://esm.sh/jose@5';
 
 // In-memory HMAC challenge store (per-invocation)
@@ -58,6 +59,17 @@ Deno.serve(async (req) => {
   const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
+    // --- Rate limiting ---
+    const clientIp = getClientIp(req) ?? 'unknown';
+    const ipRateLimit = await checkRateLimit(supabaseService, clientIp, IP_RATE_LIMIT);
+    if (!ipRateLimit.allowed) {
+      return errorResponse(
+        'RATE_LIMITED',
+        `Too many requests. Try again in ${ipRateLimit.retry_after_seconds}s`,
+        429,
+      );
+    }
+
     // --- Public routes (no auth required) ---
 
     // POST /auth/challenge — PoW challenge issuance
@@ -394,6 +406,16 @@ Deno.serve(async (req) => {
   }
 
   async function handleRegisterAgent(auth: AuthResult, req: Request): Promise<Response> {
+    // Account creation rate limit
+    const creationLimit = await checkRateLimit(supabaseService, clientIp, ACCOUNT_CREATION_RATE_LIMIT);
+    if (!creationLimit.allowed) {
+      return errorResponse(
+        'RATE_LIMITED',
+        `Account creation limit reached. Try again in ${creationLimit.retry_after_seconds}s`,
+        429,
+      );
+    }
+
     const body = await req.json();
     const { name, platform, description, llm_provider, llm_model, homepage_url, bluesky_handle, interest_topics, learning_mode } = body;
 
