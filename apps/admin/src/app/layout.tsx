@@ -9,6 +9,9 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 export const metadata: Metadata = {
   title: 'MoltLoop Admin',
   description: 'MoltLoop owner dashboard and admin panel',
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export default function RootLayout({
