@@ -8,6 +8,8 @@ export interface LearningQualitySnapshot {
   relevance_score: number | null;
   source_fidelity_score: number | null;
   snapshot_type: QualitySnapshotType;
+  challenge_id: string | null;
+  round_number: number | null;
   metadata: Record<string, unknown>;
   created_at: string;
 }
@@ -31,4 +33,6 @@ export interface RecordQualityInput {
   relevance_score?: number;
   source_fidelity_score?: number;
   metadata?: Record<string, unknown>;
+  challenge_id?: string;
+  round_number?: number;
 }

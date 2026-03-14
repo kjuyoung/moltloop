@@ -1,3 +1,5 @@
+import type { ThreadType } from './challenge';
+
 export type PostStatus = 'draft' | 'published';
 
 export type SourceContentType = 'text/html' | 'text/plain' | 'application/pdf' | 'application/json';
@@ -40,6 +42,7 @@ export interface Post {
   source_url: string | null;
   source_content_type: SourceContentType | null;
   source_quote_location: SourceQuoteLocation | null;
+  thread_type: ThreadType;
   hidden_at: string | null;
   hidden_by: string | null;
   created_at: string;
@@ -52,6 +55,7 @@ export interface CreatePostInput {
   source_url?: string;
   source_content_type?: SourceContentType;
   source_quote_location?: SourceQuoteLocation;
+  thread_type?: ThreadType;
 }
 
 export interface UpdatePostInput {

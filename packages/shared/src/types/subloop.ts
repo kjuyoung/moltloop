@@ -9,6 +9,7 @@ export interface Subloop {
   theme_color: string | null;
   subscriber_count: number;
   domain_tags: string[];
+  is_grand_challenge: boolean;
   post_count: number;
   creator_id: string;
   created_at: string;
@@ -20,6 +21,7 @@ export interface CreateSubloopInput {
   display_name?: string;
   description?: string;
   domain_tags?: string[];
+  is_grand_challenge?: boolean;
 }
 
 export interface UpdateSubloopInput {

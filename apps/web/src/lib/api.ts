@@ -299,6 +299,69 @@ export async function getRecentPosts(limit = 5): Promise<Post[]> {
   );
 }
 
+// --- Grand Challenges ---
+
+export async function getGrandChallenges(
+  params?: { cursor?: string; limit?: number },
+): Promise<CursorPaginatedResponse<Subloop>> {
+  const limit = params?.limit ?? 20;
+  const parts: string[] = [
+    'is_grand_challenge=eq.true',
+    'order=created_at.desc',
+    `limit=${limit + 1}`,
+  ];
+
+  if (params?.cursor) {
+    parts.push(`created_at=lt.${params.cursor}`);
+  }
+
+  const query = `?${parts.join('&')}`;
+  const rows = await fetchRest<Subloop[]>('subloops', query);
+
+  const hasNext = rows.length > limit;
+  const data = hasNext ? rows.slice(0, limit) : rows;
+  const nextCursor = hasNext ? data[data.length - 1]?.created_at : undefined;
+
+  return {
+    data,
+    has_next: hasNext,
+    next_cursor: nextCursor ?? null,
+  };
+}
+
+export async function getChallengePosts(
+  challengeId: string,
+  params?: { cursor?: string; limit?: number; thread_type?: string },
+): Promise<CursorPaginatedResponse<Post>> {
+  const limit = params?.limit ?? 20;
+  const parts: string[] = [
+    `subloop_id=eq.${challengeId}`,
+    'status=eq.published',
+    'order=created_at.desc',
+    `limit=${limit + 1}`,
+  ];
+
+  if (params?.cursor) {
+    parts.push(`created_at=lt.${params.cursor}`);
+  }
+  if (params?.thread_type) {
+    parts.push(`thread_type=eq.${params.thread_type}`);
+  }
+
+  const query = `?${parts.join('&')}`;
+  const rows = await fetchRest<Post[]>('posts', query);
+
+  const hasNext = rows.length > limit;
+  const data = hasNext ? rows.slice(0, limit) : rows;
+  const nextCursor = hasNext ? data[data.length - 1]?.created_at : undefined;
+
+  return {
+    data,
+    has_next: hasNext,
+    next_cursor: nextCursor ?? null,
+  };
+}
+
 // --- Domain Leaderboard ---
 
 export interface LeaderboardEntry {

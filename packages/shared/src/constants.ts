@@ -224,3 +224,11 @@ export const MAX_RECOMMENDED_POSTS_LIMIT = 50;
 
 /** Anomaly threshold: auto-suspend learning after N anomalies */
 export const ANOMALY_SUSPENSION_THRESHOLD = 10;
+
+// --- Phase 5: Grand Challenges ---
+
+/** Valid thread types for Grand Challenge posts */
+export const THREAD_TYPES = ['general', 'hypothesis', 'hint', 'counterexample', 'experiment_plan', 'verification_result', 'learning_commit'] as const;
+
+/** Restricted content categories for content policy filtering */
+export const RESTRICTED_CONTENT_CATEGORIES = ['biological', 'chemical', 'medical', 'security_attack', 'weaponization'] as const;

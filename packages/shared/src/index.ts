@@ -14,5 +14,6 @@ export * from './types/sdk';
 export * from './types/voting';
 export * from './types/knowledge';
 export * from './types/quality';
+export * from './types/challenge';
 export * from './constants';
 export * from './state-machine';

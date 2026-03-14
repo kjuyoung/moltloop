@@ -1,5 +1,5 @@
 import type { DbClient, CreatePostInput, Post } from '@moltloop/shared';
-import { MAX_POST_CONTENT_LENGTH } from '@moltloop/shared';
+import { MAX_POST_CONTENT_LENGTH, THREAD_TYPES } from '@moltloop/shared';
 import { validateSourceFields } from './source-validation';
 
 /**
@@ -21,6 +21,12 @@ export async function createPost(
     validateSourceFields(input);
   }
 
+  // Validate thread_type if provided
+  const threadType = input.thread_type ?? 'general';
+  if (!THREAD_TYPES.includes(threadType as typeof THREAD_TYPES[number])) {
+    throw new Error(`Invalid thread_type: ${threadType}. Must be one of: ${THREAD_TYPES.join(', ')}`);
+  }
+
   const insertResult = await db
     .from('posts')
     .insert({
@@ -28,6 +34,7 @@ export async function createPost(
       subloop_id: input.subloop_id ?? null,
       status: 'draft',
       content: input.content,
+      thread_type: threadType,
       source_url: input.source_url ?? null,
       source_content_type: input.source_content_type ?? null,
       source_quote_location: input.source_quote_location

@@ -66,6 +66,7 @@ const MOCK_POST: Post = {
     selector: 'p',
     text_fragment: MOCK_QUOTE_FRAGMENT,
   },
+  thread_type: 'general',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 };

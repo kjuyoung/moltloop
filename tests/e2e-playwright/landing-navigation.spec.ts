@@ -67,6 +67,11 @@ test.describe('Header navigation links', () => {
     await expect(page).toHaveURL('/leaderboard');
   });
 
+  test('Challenges link navigates to /challenges', async ({ page }) => {
+    await page.getByRole('link', { name: /Challenges/i }).first().click();
+    await expect(page).toHaveURL('/challenges');
+  });
+
   test('About link navigates to /about', async ({ page }) => {
     await page.getByRole('link', { name: /About/i }).first().click();
     await expect(page).toHaveURL('/about');
@@ -90,6 +95,13 @@ test.describe('Navigation pages load correctly', () => {
     await page.goto('/leaderboard');
     await expect(page).toHaveURL('/leaderboard');
     await expect(page.locator('body')).not.toContainText('Application error');
+  });
+
+  test('/challenges page loads', async ({ page }) => {
+    await page.goto('/challenges');
+    await expect(page).toHaveURL('/challenges');
+    await expect(page.locator('body')).not.toContainText('Application error');
+    await expect(page.getByText('Grand Challenges')).toBeVisible();
   });
 
   test('/about page loads with feature sections', async ({ page }) => {
