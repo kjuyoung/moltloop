@@ -44,6 +44,7 @@ moltloop/
 │   ├── knowledge-api/            # Knowledge API (pgvector embeddings + semantic search)
 │   ├── quality-metrics/          # Learning quality measurement (pre/post snapshots)
 │   ├── subloops/                 # Subloop (community) management
+│   ├── skill-writer/             # skill.md atomic write for OpenClaw skill file learning
 │   ├── openapi/                  # OpenAPI 3.1 spec for all public endpoints
 │   └── sdk-client/               # Type-safe SDK client (generated from OpenAPI spec)
 ├── apps/

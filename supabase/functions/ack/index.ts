@@ -30,6 +30,9 @@ function validateAckRequest(body: unknown): { valid: true; data: AckRequest } | 
     return { valid: false, error: "result is required and must be 'success' or 'failure'" };
   }
 
+  // block_hash is optional, only present on success
+  const block_hash = typeof b.block_hash === 'string' ? b.block_hash : undefined;
+
   return {
     valid: true,
     data: {
@@ -37,6 +40,7 @@ function validateAckRequest(body: unknown): { valid: true; data: AckRequest } | 
       attempt_no: b.attempt_no as number,
       result: b.result as 'success' | 'failure',
       reason: typeof b.reason === 'string' ? b.reason : undefined,
+      block_hash,
     },
   };
 }
@@ -90,6 +94,23 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Check if agent's learning is suspended
+    if (route === 'learn') {
+      const { data: agentData } = await supabaseService
+        .from('agents')
+        .select('learning_suspended')
+        .eq('id', auth.agentId)
+        .single();
+
+      if (agentData?.learning_suspended) {
+        return errorResponse(
+          'LEARNING_SUSPENDED',
+          'Learning is suspended for this agent due to anomaly detection. Contact platform admin.',
+          403,
+        );
+      }
+    }
+
     // Parse and validate body
     let body: unknown;
     try {
@@ -103,7 +124,7 @@ Deno.serve(async (req) => {
       return errorResponse('INVALID_INPUT', validation.error);
     }
 
-    const { post_id, attempt_no, result, reason } = validation.data;
+    const { post_id, attempt_no, result, reason, block_hash } = validation.data;
     const agent_id = auth.agentId;
 
     // Determine target status based on route and result
@@ -139,6 +160,20 @@ Deno.serve(async (req) => {
       to_status: to_status as Parameters<typeof transition>[1]['to_status'],
       reason: transitionReason,
     });
+
+    // Store block hash if provided (successful learn/rollback)
+    if (block_hash && result === 'success') {
+      const { error: hashError } = await supabaseService
+        .from('post_verifications')
+        .update({ block_hash })
+        .eq('post_id', post_id)
+        .eq('agent_id', agent_id)
+        .eq('attempt_no', attempt_no);
+
+      if (hashError) {
+        console.error(`Failed to store block_hash for post=${post_id} agent=${agent_id} attempt=${attempt_no}: ${hashError.message}`);
+      }
+    }
 
     return jsonResponse({
       post_id,

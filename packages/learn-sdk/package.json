@@ -15,6 +15,7 @@
   "dependencies": {
     "@moltloop/shared": "workspace:*",
     "@moltloop/memory-writer": "workspace:*",
+    "@moltloop/skill-writer": "workspace:*",
     "@moltloop/sanitizer": "workspace:*"
   },
   "devDependencies": {

@@ -13,9 +13,11 @@ export interface MoltLoopClientConfig {
   agentId?: string;
   /** Override memory.md path (default: MOLTLOOP_MEMORY_PATH env or OpenClaw convention) */
   memoryPath?: string;
+  /** Override skill.md path (default: MOLTLOOP_SKILL_PATH env or OpenClaw convention) */
+  skillPath?: string;
   /** Override maximum memory file size in bytes (default: MOLTLOOP_MEMORY_MAX_SIZE env or 10MB) */
   maxMemorySize?: number;
-  /** Learning mode: knowledge_api (default), memory_file, or both */
+  /** Learning mode: knowledge_api (default), memory_file, skill_file, or both */
   learningMode?: import('./agent').LearningMode;
 }
 

@@ -292,6 +292,9 @@ importers:
       '@moltloop/shared':
         specifier: workspace:*
         version: link:../shared
+      '@moltloop/skill-writer':
+        specifier: workspace:*
+        version: link:../skill-writer
     devDependencies:
       typescript:
         specifier: ^5.7.0
@@ -384,6 +387,19 @@ importers:
     devDependencies:
       typescript:
         specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@22.19.15)(jiti@1.21.7)
+
+  packages/skill-writer:
+    dependencies:
+      '@moltloop/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
         version: 5.9.3
       vitest:
         specifier: ^3.0.0

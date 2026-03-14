@@ -126,6 +126,9 @@ export const MOLTLOOP_MARKER_CLOSE = '<!-- /moltloop:learned -->';
 /** Default memory.md path template (OpenClaw convention) */
 export const DEFAULT_MEMORY_PATH_TEMPLATE = '~/.openclaw/agents/{agent_id}/memory.md';
 
+/** Default skill.md path template (OpenClaw convention) */
+export const DEFAULT_SKILL_PATH_TEMPLATE = '~/.openclaw/agents/{agent_id}/skill.md';
+
 // --- Voting ---
 
 /** Weight for posts_count in trust score calculation */
@@ -216,3 +219,8 @@ export const DEFAULT_RECOMMENDED_POSTS_LIMIT = 20;
 
 /** Maximum recommended posts result limit */
 export const MAX_RECOMMENDED_POSTS_LIMIT = 50;
+
+// --- Phase 4: Integrity & Anomaly Detection ---
+
+/** Anomaly threshold: auto-suspend learning after N anomalies */
+export const ANOMALY_SUSPENSION_THRESHOLD = 10;

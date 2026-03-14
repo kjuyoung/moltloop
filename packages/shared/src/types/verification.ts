@@ -16,6 +16,7 @@ export interface PostVerification {
   verified_at: string | null;
   learned_at: string | null;
   rolled_back_at: string | null;
+  block_hash: string | null;
   created_at: string;
 }
 
@@ -49,6 +50,8 @@ export interface AckRequest {
   attempt_no: number;
   result: 'success' | 'failure';
   reason?: string;
+  /** SHA-256 hex hash of the learned block content (only on success) */
+  block_hash?: string;
 }
 
 export interface SyncMemoryStateRequest {

@@ -9,6 +9,7 @@ import { jsonResponse, errorResponse } from '../_shared/response.ts';
 import { authenticateRequest } from '../_shared/auth-middleware.ts';
 import type { AuthResult } from '../_shared/auth-middleware.ts';
 import { transition, recordEvent } from '@moltloop/verification-service';
+import { ANOMALY_SUSPENSION_THRESHOLD } from '@moltloop/shared';
 
 Deno.serve(async (req) => {
   // Step 1: Handle CORS preflight
@@ -48,8 +49,13 @@ Deno.serve(async (req) => {
     }
 
     // Step 4: Parse body as SyncMemoryStateRequest
-    const body = await req.json();
-    const { learned_blocks } = body;
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return errorResponse('INVALID_INPUT', 'Request body must be valid JSON');
+    }
+    const { learned_blocks } = body as Record<string, unknown>;
 
     // Step 5: Validate learned_blocks
     if (!Array.isArray(learned_blocks)) {
@@ -199,11 +205,94 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Step 8: Update anomaly count and check suspension threshold
+    let suspensionInfo: {
+      learning_suspended: boolean;
+      suspended_at?: string;
+      reason?: string;
+      anomaly_count?: number;
+    } = { learning_suspended: false };
+
+    if (anomalies.length > 0) {
+      // Atomically increment anomaly_count via RPC (avoids read-modify-write race)
+      const { data: incrementResult, error: incrementError } = await supabaseService
+        .rpc('increment_anomaly_count', {
+          p_agent_id: auth.agentId,
+          p_increment: anomalies.length,
+        })
+        .single();
+
+      if (!incrementError && incrementResult) {
+        const newCount = incrementResult.new_count;
+        const wasSuspended = incrementResult.was_suspended;
+
+        // Auto-suspend if threshold reached and not already suspended
+        if (!wasSuspended && newCount >= ANOMALY_SUSPENSION_THRESHOLD) {
+          const suspendedAt = new Date().toISOString();
+          const suspendedReason =
+            `Auto-suspended: ${newCount} sync anomalies detected (threshold: ${ANOMALY_SUSPENSION_THRESHOLD}). ` +
+            `Agent consistently reports success but blocks are missing from local memory.md on reconnection.`;
+
+          await supabaseService
+            .from('agents')
+            .update({
+              learning_suspended: true,
+              learning_suspended_at: suspendedAt,
+              learning_suspended_reason: suspendedReason,
+            })
+            .eq('id', auth.agentId);
+
+          suspensionInfo = {
+            learning_suspended: true,
+            suspended_at: suspendedAt,
+            reason: suspendedReason,
+            anomaly_count: newCount,
+          };
+
+          // Record suspension event in audit log
+          try {
+            await recordEvent(supabaseService, {
+              post_id: anomalies[0].post_id,
+              agent_id: auth.agentId,
+              attempt_no: anomalies[0].attempt_no,
+              from_status: 'learned',
+              to_status: 'learned',
+              reason: `learning_auto_suspended: anomaly_count=${newCount}, threshold=${ANOMALY_SUSPENSION_THRESHOLD}`,
+            });
+          } catch {
+            // Best-effort audit logging
+          }
+        } else if (wasSuspended) {
+          // Already suspended — fetch existing suspension details for response
+          const { data: existingStatus } = await supabaseService
+            .from('agents')
+            .select('learning_suspended_at, learning_suspended_reason, anomaly_count')
+            .eq('id', auth.agentId)
+            .single();
+
+          suspensionInfo = {
+            learning_suspended: true,
+            suspended_at: existingStatus?.learning_suspended_at,
+            reason: existingStatus?.learning_suspended_reason,
+            anomaly_count: existingStatus?.anomaly_count,
+          };
+        }
+      }
+    }
+
     return jsonResponse({
       agent_id: auth.agentId,
       adjustments,
       anomalies,
       ...(errors.length > 0 && { errors }),
+      learning_suspended: suspensionInfo.learning_suspended,
+      ...(suspensionInfo.learning_suspended && {
+        suspension_info: {
+          suspended_at: suspensionInfo.suspended_at,
+          reason: suspensionInfo.reason,
+          anomaly_count: suspensionInfo.anomaly_count,
+        },
+      }),
     });
   } catch (err) {
     console.error('Sync memory-state error:', err);

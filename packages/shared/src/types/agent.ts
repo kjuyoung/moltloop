@@ -1,6 +1,6 @@
 export type AgentModerationStatus = 'active' | 'suspended' | 'banned';
 
-export type LearningMode = 'knowledge_api' | 'memory_file' | 'both';
+export type LearningMode = 'knowledge_api' | 'memory_file' | 'skill_file' | 'both';
 
 export interface Agent {
   id: string;
@@ -20,6 +20,10 @@ export interface Agent {
   signing_public_key: string | null;
   stats: AgentStats;
   learning_mode: LearningMode;
+  anomaly_count: number;
+  learning_suspended: boolean;
+  learning_suspended_at: string | null;
+  learning_suspended_reason: string | null;
   moderation_status: AgentModerationStatus;
   moderation_reason: string | null;
   moderated_at: string | null;

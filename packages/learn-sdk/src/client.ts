@@ -14,6 +14,12 @@ import {
   removeLearningBlock,
   listLearnedBlocks,
 } from '@moltloop/memory-writer';
+import {
+  resolveSkillPath,
+  appendSkillBlock,
+  removeSkillBlock,
+  listSkillBlocks,
+} from '@moltloop/skill-writer';
 import { sanitize } from '@moltloop/sanitizer';
 
 import { HttpClient, HttpError } from './http-client';
@@ -81,6 +87,7 @@ interface AckRollbackResponse {
 export class MoltLoopClient {
   private readonly http: HttpClient;
   private memoryPath: string;
+  private skillPath: string;
   private agentId: string;
   private readonly maxMemorySize?: number;
   private readonly learningMode: LearningMode;
@@ -90,6 +97,7 @@ export class MoltLoopClient {
     this.http = new HttpClient(config.serverUrl, config.apiKey);
     this.agentId = config.agentId ?? '';
     this.memoryPath = config.memoryPath ?? '';
+    this.skillPath = config.skillPath ?? '';
     this.maxMemorySize = config.maxMemorySize;
     this.learningMode = config.learningMode ?? 'knowledge_api';
   }
@@ -116,6 +124,11 @@ export class MoltLoopClient {
       this.memoryPath = resolveMemoryPath(this.agentId);
     }
 
+    // Resolve skill path now that we have the agent ID
+    if (!this.skillPath) {
+      this.skillPath = resolveSkillPath(this.agentId);
+    }
+
     const syncResult = await this.sync();
     this.initialized = true;
     return syncResult;
@@ -133,7 +146,13 @@ export class MoltLoopClient {
    * another device).
    */
   async sync(): Promise<SyncResult> {
-    const localBlocks = await listLearnedBlocks(this.memoryPath);
+    let localBlocks = await listLearnedBlocks(this.memoryPath);
+
+    // Also include skill file blocks if using skill_file mode
+    if (this.learningMode === 'skill_file') {
+      const skillBlocks = await listSkillBlocks(this.skillPath);
+      localBlocks = [...localBlocks, ...skillBlocks];
+    }
 
     const payload: SyncMemoryStateRequest = {
       learned_blocks: localBlocks.map((b) => ({
@@ -241,6 +260,7 @@ export class MoltLoopClient {
 
     const useKnowledgeApi = this.learningMode === 'knowledge_api' || this.learningMode === 'both';
     const useMemoryFile = this.learningMode === 'memory_file' || this.learningMode === 'both';
+    const useSkillFile = this.learningMode === 'skill_file';
 
     // Step 3: Knowledge API path (fire-and-forget, no ack needed)
     if (useKnowledgeApi) {
@@ -270,11 +290,13 @@ export class MoltLoopClient {
         writeSuccess = false;
       }
 
+      const blockHash = writeSuccess ? await this.hashContent(sanitizeResult.content) : undefined;
+
       const ackPayload: AckRequest = {
         post_id: postId,
         attempt_no,
         result: writeSuccess ? 'success' : 'failure',
-        ...(writeSuccess ? {} : { reason: 'memory_write_failed' }),
+        ...(writeSuccess ? { block_hash: blockHash } : { reason: 'memory_write_failed' }),
       };
 
       try {
@@ -313,11 +335,78 @@ export class MoltLoopClient {
       }
     }
 
+    // Step 4b: Skill file path (ack-based, similar to memory file)
+    if (useSkillFile) {
+      const block: LearnedBlock = {
+        post_id: postId,
+        attempt_no,
+        timestamp: new Date().toISOString(),
+        content: sanitizeResult.content,
+        source_url: source_url ?? '',
+      };
+
+      let writeSuccess: boolean;
+      try {
+        writeSuccess = await appendSkillBlock(
+          this.skillPath,
+          block,
+          this.maxMemorySize,
+        );
+      } catch {
+        writeSuccess = false;
+      }
+
+      const blockHash = writeSuccess ? await this.hashContent(sanitizeResult.content) : undefined;
+
+      const ackPayload: AckRequest = {
+        post_id: postId,
+        attempt_no,
+        result: writeSuccess ? 'success' : 'failure',
+        ...(writeSuccess ? { block_hash: blockHash } : { reason: 'skill_write_failed' }),
+      };
+
+      try {
+        const ackRes = await this.http.request<AckLearnResponse>(
+          '/ack/learn',
+          ackPayload,
+        );
+
+        if (writeSuccess) {
+          if (options?.trackQuality) {
+            this.recordQualitySnapshot(postId, attempt_no, 'post_learn').catch(() => {});
+          }
+          return {
+            success: true,
+            post_id: postId,
+            attempt_no,
+            learned_at: ackRes.learned_at ?? new Date().toISOString(),
+          };
+        }
+
+        return {
+          success: false,
+          post_id: postId,
+          reason: 'skill_write_failed',
+          detail: `Failed to append skill block for post ${postId} (attempt ${attempt_no}) to ${this.skillPath}`,
+        };
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        return {
+          success: false,
+          post_id: postId,
+          reason: 'ack_error',
+          detail: `Learn ack failed for post ${postId} (attempt ${attempt_no}): ${detail}`,
+        };
+      }
+    }
+
     // Knowledge API-only path: ack directly without memory.md write
+    const blockHash = await this.hashContent(sanitizeResult.content);
     const ackPayload: AckRequest = {
       post_id: postId,
       attempt_no,
       result: 'success',
+      block_hash: blockHash,
     };
 
     try {
@@ -382,14 +471,14 @@ export class MoltLoopClient {
       };
     }
 
-    // Step 2: Remove block from memory.md
+    // Step 2: Remove block from memory.md or skill.md
     let removeSuccess: boolean;
     try {
-      removeSuccess = await removeLearningBlock(
-        this.memoryPath,
-        postId,
-        attemptNo,
-      );
+      if (this.learningMode === 'skill_file') {
+        removeSuccess = await removeSkillBlock(this.skillPath, postId, attemptNo);
+      } else {
+        removeSuccess = await removeLearningBlock(this.memoryPath, postId, attemptNo);
+      }
     } catch {
       removeSuccess = false;
     }
@@ -422,7 +511,7 @@ export class MoltLoopClient {
         post_id: postId,
         attempt_no: attemptNo,
         reason: 'memory_remove_failed',
-        detail: `Failed to remove learning block for post ${postId} (attempt ${attemptNo}) from ${this.memoryPath}`,
+        detail: `Failed to remove learning block for post ${postId} (attempt ${attemptNo}) from ${this.learningMode === 'skill_file' ? this.skillPath : this.memoryPath}`,
       };
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
@@ -442,6 +531,17 @@ export class MoltLoopClient {
   // ---------------------------------------------------------------------------
   // Internal
   // ---------------------------------------------------------------------------
+
+  /**
+   * Generate SHA-256 hex hash of content using Web Crypto API.
+   */
+  private async hashContent(content: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(content);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
 
   private assertInitialized(): void {
     if (!this.initialized) {
