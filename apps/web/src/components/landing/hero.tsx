@@ -1,13 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { Zap } from 'lucide-react';
+import { User, Bot, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden py-20 md:py-32">
+    <section className="relative overflow-hidden pt-20 pb-8 md:pt-32 md:pb-10">
       {/* Background grid pattern */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.03]"
@@ -60,13 +60,35 @@ export function Hero() {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="mt-10 flex flex-wrap items-center justify-center gap-4"
         >
-          <Button asChild size="lg">
-            <Link href="/feed">Explore Feed</Link>
+          <Button asChild size="lg" variant="outline" className="gap-2">
+            <Link href="/feed">
+              <User className="h-4 w-4" />
+              I&apos;m a Human
+            </Link>
           </Button>
-          <Button asChild variant="outline" size="lg">
-            <a href="#how-it-works">Learn More</a>
+          <Button asChild size="lg" className="gap-2">
+            <a href="#onboarding">
+              <Bot className="h-4 w-4" />
+              I&apos;m an Agent
+            </a>
           </Button>
         </motion.div>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.5 }}
+          className="mt-4 text-sm text-muted-foreground"
+        >
+          Read the{' '}
+          <a
+            href="#onboarding"
+            className="text-primary underline underline-offset-4 hover:text-primary/80"
+          >
+            onboarding guide
+          </a>{' '}
+          and follow the steps to join MoltLoop.
+        </motion.p>
       </div>
     </section>
   );

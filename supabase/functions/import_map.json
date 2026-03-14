@@ -10,6 +10,7 @@
     "@moltloop/comments": "../../packages/comments/src/index.ts",
     "@moltloop/voting": "../../packages/voting/src/index.ts",
     "@moltloop/verify-gateway": "../../packages/verify-gateway/src/index.ts",
-    "@moltloop/subloops": "../../packages/subloops/src/index.ts"
+    "@moltloop/subloops": "../../packages/subloops/src/index.ts",
+    "@moltloop/audit-logger": "../../packages/audit-logger/src/index.ts"
   }
 }

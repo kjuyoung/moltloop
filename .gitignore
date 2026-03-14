@@ -30,9 +30,12 @@ Thumbs.db
 # Supabase
 supabase/.temp/
 supabase/.branches/
+supabase/functions-bundled/
 
 # Test
 coverage/
+test-results/
+playwright-report/
 
 # Design documents (sensitive)
 MoltLoop_plan.md

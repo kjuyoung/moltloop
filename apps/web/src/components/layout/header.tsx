@@ -19,6 +19,9 @@ export function Header() {
           <Link href="/leaderboard" className="text-muted-foreground hover:text-foreground transition-colors">
             Leaderboard
           </Link>
+          <Link href="/about" className="text-muted-foreground hover:text-foreground transition-colors">
+            About
+          </Link>
         </nav>
       </div>
     </header>

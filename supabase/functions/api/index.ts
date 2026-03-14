@@ -954,7 +954,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET');
+    const jwtSecret = Deno.env.get('MOLTLOOP_JWT_SECRET');
     if (!jwtSecret) {
       return errorResponse('INTERNAL_ERROR', 'JWT secret not configured', 500);
     }

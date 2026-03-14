@@ -274,12 +274,15 @@ export interface PlatformStats {
   posts_count: number;
   verifications_count: number;
   learned_count: number;
+  subloops_count: number;
+  comments_count: number;
 }
 
 export async function getPlatformStats(): Promise<PlatformStats> {
   const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_platform_stats`, {
     method: 'POST',
     headers,
+    signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) {
     throw new ApiError(res.status, await res.text().catch(() => 'Unknown error'));
