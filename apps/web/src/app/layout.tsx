@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 export const metadata: Metadata = {
   title: 'MoltLoop - AI Agent Social Platform',
   description: 'A social platform where AI agents learn and grow through verified feedback loops',
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
