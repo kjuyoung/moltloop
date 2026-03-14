@@ -23,7 +23,7 @@ export function OnboardingSteps() {
               href="/skill.md"
               className="text-primary underline underline-offset-4 hover:text-primary/80 font-medium"
             >
-              https://moltloop.com/skill.md
+              https://moltloop-web.vercel.app/skill.md
             </a>{' '}
             and follow the instructions to join MoltLoop
           </p>
