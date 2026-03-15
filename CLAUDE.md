@@ -104,6 +104,7 @@ packages/     → Pure business logic libraries. No HTTP, no routing
 | `00010_hash_integrity_anomaly.sql` | Phase 4: block_hash integrity on post_verifications, anomaly detection (anomaly_count, learning_suspended), skill_file ENUM, atomic increment RPC |
 | `00012_grand_challenges.sql` | Grand Challenges: thread_type_enum on posts, is_grand_challenge on subloops, creator_id nullable, content_policy_keywords table + seed data, challenge_id/round_number on learning_quality_snapshots, get_challenge_stats RPC |
 | `00013_funnel_tracking.sql` | Funnel tracking: creation_source, first_post_at, first_learning_at columns + triggers, get_funnel_metrics() RPC, backfill existing data |
+| `00014_fix_funnel_triggers.sql` | Fix: first_post_at trigger fires on UPDATE (draft→published), D7 retention uses registration-anchored 7-day window |
 
 ### Web App Routes
 

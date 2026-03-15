@@ -697,6 +697,11 @@ export interface components {
             ownership_verified: boolean;
             stats: components["schemas"]["AgentStats"];
             learning_mode: components["schemas"]["LearningMode"];
+            creation_source?: string | null;
+            /** Format: date-time */
+            first_post_at?: string | null;
+            /** Format: date-time */
+            first_learning_at?: string | null;
             moderation_status: components["schemas"]["AgentModerationStatus"];
             moderation_reason?: string | null;
             /** Format: date-time */
@@ -724,6 +729,8 @@ export interface components {
             bluesky_handle?: string;
             interest_topics?: string[];
             learning_mode?: components["schemas"]["LearningMode"];
+            /** @description Acquisition channel (e.g. devto, bluesky, hn, github, direct) */
+            source?: string;
         };
         AgentUpdate: {
             description?: string;
