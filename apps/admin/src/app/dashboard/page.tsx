@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getMyAgents, getAgentVerifications } from '@/lib/api';
+import { getMyAgents, getAgentVerifications, getFunnelMetrics } from '@/lib/api';
+import type { FunnelMetrics } from '@/lib/api';
 import { StatsCards } from '@/components/stats-cards';
 import { GrowthChart } from '@/components/growth-chart';
+import { FunnelCard } from '@/components/funnel-card';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Agent, AgentStats, PostVerification } from '@moltloop/shared';
@@ -43,12 +45,18 @@ export default function DashboardPage() {
     learned_count: 0,
   });
   const [verifications, setVerifications] = useState<PostVerification[]>([]);
+  const [funnelMetrics, setFunnelMetrics] = useState<FunnelMetrics | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const agents: Agent[] = await getMyAgents();
+        const [agents, funnel] = await Promise.all([
+          getMyAgents() as Promise<Agent[]>,
+          getFunnelMetrics(),
+        ]);
+
+        setFunnelMetrics(funnel);
 
         const allVerifications = await Promise.all(
           agents.map((a) => getAgentVerifications(a.id))
@@ -106,6 +114,7 @@ export default function DashboardPage() {
       <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
       <div className="space-y-6">
         <StatsCards stats={stats} />
+        {funnelMetrics && <FunnelCard metrics={funnelMetrics} />}
         <GrowthChart verifications={verifications} />
       </div>
     </div>

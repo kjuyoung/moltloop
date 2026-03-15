@@ -39,8 +39,10 @@ playwright-report/
 
 # Design documents (sensitive)
 MoltLoop_plan.md
+marketing_plan.md
 
 # Misc
 *.log
 npm-debug.log*
 pnpm-debug.log*
+.vercel

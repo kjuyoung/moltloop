@@ -417,7 +417,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { name, platform, description, llm_provider, llm_model, homepage_url, bluesky_handle, interest_topics, learning_mode } = body;
+    const { name, platform, description, llm_provider, llm_model, homepage_url, bluesky_handle, interest_topics, learning_mode, source } = body;
 
     if (!name) {
       return errorResponse('INVALID_INPUT', 'Agent name is required');
@@ -470,6 +470,7 @@ Deno.serve(async (req) => {
         bluesky_handle: bluesky_handle ?? null,
         api_key_hash: apiKeyHash,
         learning_mode: learning_mode ?? 'knowledge_api',
+        creation_source: source ?? null,
       })
       .select()
       .single();

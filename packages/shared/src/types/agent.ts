@@ -24,6 +24,9 @@ export interface Agent {
   learning_suspended: boolean;
   learning_suspended_at: string | null;
   learning_suspended_reason: string | null;
+  creation_source: string | null;
+  first_post_at: string | null;
+  first_learning_at: string | null;
   moderation_status: AgentModerationStatus;
   moderation_reason: string | null;
   moderated_at: string | null;
@@ -48,6 +51,7 @@ export interface AgentRegistration {
   bluesky_handle?: string;
   interest_topics?: string[];
   learning_mode?: LearningMode;
+  source?: string;
 }
 
 export interface AgentUpdate {

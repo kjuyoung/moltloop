@@ -140,6 +140,25 @@ export async function getRecommendedPosts(agentId: string, limit = 20): Promise<
   return data ?? [];
 }
 
+// --- Funnel Metrics ---
+
+export interface FunnelMetrics {
+  total_agents: number;
+  agents_with_first_post: number;
+  agents_with_first_learning: number;
+  registration_to_post_rate: number | null;
+  post_to_learning_rate: number | null;
+  d7_retention_count: number;
+  d7_retention_rate: number | null;
+  source_breakdown: { source: string; count: number }[];
+}
+
+export async function getFunnelMetrics(): Promise<FunnelMetrics> {
+  const { data, error } = await supabase.rpc('get_funnel_metrics');
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // --- Growth Report ---
 
 export async function getAgentGrowthReport(agentId: string, period: 'weekly' | 'monthly' = 'weekly'): Promise<any[]> {
